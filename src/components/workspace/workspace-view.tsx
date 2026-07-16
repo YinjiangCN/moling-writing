@@ -244,9 +244,7 @@ export function WorkspaceView() {
                 {formatWords(stats?.stats.totalWords || 0)}
                 <span className="text-sm font-normal text-muted-foreground ml-1">字</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                约 ¥{((stats?.stats.totalWords || 0) * 0.005).toFixed(2)} 稿费预估
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">累计创作字数</p>
             </CardContent>
           </Card>
 
@@ -276,82 +274,6 @@ export function WorkspaceView() {
             </CardContent>
           </Card>
         </div>
-
-        {/* 稿费预估板块 */}
-        <Card className="bg-gradient-to-br from-amber-50/50 to-emerald-50/30 dark:from-amber-950/20 dark:to-emerald-950/10 border-amber-200 dark:border-amber-900">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Coins className="w-4 h-4 text-amber-500" />
-              稿费预估
-              <Badge variant="outline" className="text-[10px] ml-1 text-amber-600">参考值</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* 总稿费 */}
-              <div className="sm:col-span-1 bg-card/60 backdrop-blur rounded-lg p-4 border border-amber-100 dark:border-amber-900">
-                <div className="text-xs text-muted-foreground mb-1">累计稿费预估</div>
-                <div className="text-3xl font-bold text-amber-600">
-                  ¥{((stats?.stats.totalWords || 0) * 0.005).toFixed(2)}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  总字数 {formatWords(stats?.stats.totalWords || 0)} · 千字 ¥5
-                </div>
-              </div>
-
-              {/* 今日稿费 */}
-              <div className="bg-card/60 backdrop-blur rounded-lg p-4 border border-emerald-100 dark:border-emerald-900">
-                <div className="text-xs text-muted-foreground mb-1">今日新增稿费</div>
-                <div className="text-2xl font-bold text-emerald-600">
-                  ¥{((stats?.stats.todayWords || 0) * 0.005).toFixed(2)}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  今日 {formatWords(stats?.stats.todayWords || 0)} 字
-                </div>
-              </div>
-
-              {/* 本月稿费 */}
-              <div className="bg-card/60 backdrop-blur rounded-lg p-4 border border-violet-100 dark:border-violet-900">
-                <div className="text-xs text-muted-foreground mb-1">本月稿费预估</div>
-                <div className="text-2xl font-bold text-violet-600">
-                  ¥{(() => {
-                    const monthWords = stats?.stats.heatmap?.reduce((s, h) => {
-                      const d = new Date(h.date)
-                      const now = new Date()
-                      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-                        return s + h.words
-                      }
-                      return s
-                    }, 0) || 0
-                    return (monthWords * 0.005).toFixed(2)
-                  })()}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  按千字 ¥5 计算
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              {[
-                { label: '签约作者', price: '千字 ¥5-10', desc: '基础稿费' },
-                { label: '优质作者', price: '千字 ¥10-30', desc: '加分成' },
-                { label: '白金作者', price: '千字 ¥30-100', desc: '订阅分成' },
-                { label: '大神作者', price: '千字 ¥100+', desc: 'IP 改编' },
-              ].map((level) => (
-                <div key={level.label} className="bg-muted/40 rounded p-2">
-                  <div className="font-medium text-amber-700 dark:text-amber-300">{level.label}</div>
-                  <div className="text-muted-foreground">{level.price}</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">{level.desc}</div>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-[10px] text-muted-foreground mt-3">
-              ⓘ 稿费预估仅供参考，实际稿费以平台签约合同为准。当前按「签约作者」千字 ¥5 估算。
-            </p>
-          </CardContent>
-        </Card>
 
         {/* 创作日历热力图 */}
         <Card>

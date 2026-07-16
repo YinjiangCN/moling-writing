@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { PenLine, Sparkles, Mail, Lock, User, Loader2, BookOpen, Wand2, Zap, Shield } from 'lucide-react'
+import { PenLine, Sparkles, Mail, Lock, User, Loader2, BookOpen, Wand2, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface UserPublic {
@@ -130,13 +130,6 @@ export function AuthView() {
     }
   }
 
-  const handleDemoLogin = async () => {
-    setLoginEmail('admin@moli.com')
-    setLoginPassword('admin123')
-    setTab('login')
-    toast.info('已填入管理员账号，点击登录即可')
-  }
-
   return (
     <div className="flex-1 overflow-auto bg-gradient-to-br from-violet-50 via-pink-50 to-amber-50 dark:from-violet-950/30 dark:via-pink-950/20 dark:to-amber-950/20">
       <div className="max-w-5xl mx-auto px-4 py-8 lg:py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[calc(100vh-3.5rem)]">
@@ -234,32 +227,6 @@ export function AuthView() {
                   {loginLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   登录
                 </Button>
-
-                {/* 管理员快速登录入口 */}
-                <div className="border border-violet-200 dark:border-violet-800 bg-gradient-to-br from-violet-50 to-pink-50 dark:from-violet-950/30 dark:to-pink-950/20 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-medium text-violet-700 dark:text-violet-300">
-                    <Shield className="w-3.5 h-3.5" />
-                    管理员演示账号
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <div className="text-muted-foreground">邮箱</div>
-                      <div className="font-mono text-violet-700 dark:text-violet-300">admin@moli.com</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">密码</div>
-                      <div className="font-mono text-violet-700 dark:text-violet-300">admin123</div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={handleDemoLogin}
-                    className="w-full h-7 text-xs gap-1.5 border-violet-300 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/30"
-                  >
-                    <Shield className="w-3 h-3" />
-                    一键填入管理员账号
-                  </Button>
-                </div>
               </TabsContent>
 
               <TabsContent value="register" className="space-y-4">
