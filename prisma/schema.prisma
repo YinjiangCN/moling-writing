@@ -239,3 +239,56 @@ model EmailCode {
 
   @@index([email, purpose])
 }
+
+// ============ 兑换码系统 ============
+// 兑换码（管理员生成）
+model RedeemCode {
+  id          String    @id @default(cuid())
+  code        String    @unique // 兑换码（大写字母+数字）
+  // 奖励类型
+  rewardType  String    // token / plan
+  // token 奖励
+  tokenAmount Int       @default(0) // 当 rewardType=token 时有效
+  // 会员奖励
+  planReward  String?   // pro / year，当 rewardType=plan 时有效
+  planDays    Int       @default(0) // 会员天数（如 30 天月卡）
+  // 批次信息
+  batchId     String?   // 批次 ID（同一次生成的归为一批）
+  batchNote   String?   // 批次备注（如「双十一活动」）
+  // 状态
+  status      String    @default("unused") // unused / used / disabled
+  usedBy      String?   // 使用者 userId
+  usedAt      DateTime?
+  expiresAt   DateTime? // 兑换码过期时间（null 表示永久）
+  // 创建信息
+  createdById String    // 创建管理员 id
+  createdAt   DateTime  @default(now())
+
+  history     RedeemHistory[]
+
+  @@index([batchId])
+  @@index([status])
+}
+
+// 兑换历史记录
+model RedeemHistory {
+  id        String   @id @default(cuid())
+  codeId    String
+  code      String   // 冗余存储兑换码字符串
+  userId    String
+  // 兑换时的奖励快照
+  rewardType String
+  tokenAmount Int
+  planReward  String?
+  planDays    Int
+  // 兑换前后的余额
+  tokensBefore Int
+  tokensAfter  Int
+  planBefore   String
+  planAfter    String
+  redeemedAt   DateTime @default(now())
+
+  redeemCode RedeemCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

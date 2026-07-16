@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { api, formatWords, formatTime } from '@/lib/helpers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,8 @@ import {
   Check,
   Loader2,
   Receipt,
+  Ticket,
+  Gift,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -436,6 +438,9 @@ export function UserCenter() {
           </Card>
         </div>
 
+        {/* 兑换码 */}
+        <RedeemCard onRedeemed={load} />
+
         {/* 充值记录 */}
         {orders.length > 0 && (
           <Card>
@@ -584,5 +589,124 @@ export function UserCenter() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// ============ 兑换码卡片 ============
+function RedeemCard({ onRedeemed }: { onRedeemed: () => Promise<void> }) {
+  const [code, setCode] = useState('')
+  const [redeeming, setRedeeming] = useState(false)
+  const [history, setHistory] = useState<any[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const r = await api<{ history: any[] }>('/api/redeem')
+      setHistory(r.history)
+    } catch (e) {
+      // 静默
+    }
+  }, [])
+
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
+
+  const handleRedeem = async () => {
+    if (!code.trim()) {
+      toast.error('请输入兑换码')
+      return
+    }
+    setRedeeming(true)
+    try {
+      const r = await api('/api/redeem', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      })
+      toast.success(r.message)
+      setCode('')
+      onRedeemed()
+      loadHistory()
+    } catch (e: any) {
+      toast.error(e.message || '兑换失败')
+    } finally {
+      setRedeeming(false)
+    }
+  }
+
+  return (
+    <Card className="border-violet-200 dark:border-violet-900 bg-gradient-to-br from-violet-50/50 to-pink-50/50 dark:from-violet-950/20 dark:to-pink-950/20">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Ticket className="w-4 h-4 text-violet-500" />
+          兑换码
+          {history.length > 0 && (
+            <Badge variant="outline" className="text-xs ml-2">
+              已兑换 {history.length} 次
+            </Badge>
+          )}
+          {history.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-7 text-xs"
+              onClick={() => setShowHistory(!showHistory)}
+            >
+              {showHistory ? '收起记录' : '查看记录'}
+            </Button>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex gap-2">
+          <Input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="输入兑换码，如 ABCD-1234-EFGH"
+            className="font-mono tracking-wider flex-1"
+            onKeyDown={(e) => e.key === 'Enter' && handleRedeem()}
+          />
+          <Button
+            onClick={handleRedeem}
+            disabled={redeeming || !code.trim()}
+            className="gap-1.5 shrink-0 bg-gradient-to-r from-violet-500 to-pink-500 hover:opacity-90"
+          >
+            {redeeming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gift className="w-4 h-4" />}
+            立即兑换
+          </Button>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          💡 兑换码可获取 Token 余额或会员权益。兑换码格式不区分大小写，可包含或省略连字符。
+        </p>
+
+        {showHistory && history.length > 0 && (
+          <div className="border-t pt-3 space-y-2">
+            <div className="text-xs font-medium text-muted-foreground">兑换记录</div>
+            {history.map((h: any) => (
+              <div
+                key={h.id}
+                className="flex items-center justify-between p-2 bg-card/60 rounded text-sm border border-violet-100 dark:border-violet-900"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono text-xs truncate">{h.code}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {h.rewardType === 'token'
+                      ? `+${h.tokenAmount.toLocaleString()} Token`
+                      : `${h.planReward === 'year' ? '年卡' : '月卡'}会员 ${h.planDays} 天`}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground text-right">
+                  <div>{formatTime(h.redeemedAt)}</div>
+                  <div className="text-[10px]">
+                    {h.tokensBefore.toLocaleString()} → {h.tokensAfter.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

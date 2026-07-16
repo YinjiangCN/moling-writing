@@ -162,3 +162,71 @@ Stage Summary:
   * 用户提供的 163 密码是邮箱登录密码，不是 SMTP 授权码
   * 163 邮箱要求使用「客户端授权密码」，需用户在 163 邮箱后台开启 SMTP 服务并生成授权码
   * UI 已明确提示此注意事项
+
+---
+Task ID: extend-3
+Agent: 主 Agent (fullstack-dev)
+Task: 实现兑换码兑换会员/Token 功能
+
+Work Log:
+- 扩展 Prisma schema：新增 RedeemCode（兑换码）和 RedeemHistory（兑换历史）模型
+  * RedeemCode: code(unique)、rewardType(token/plan)、tokenAmount、planReward(pro/year)、planDays、batchId、batchNote、status(unused/used/disabled)、usedBy、usedAt、expiresAt、createdById
+  * RedeemHistory: codeId、code(冗余)、userId、rewardType、tokenAmount、planReward、planDays、tokensBefore/After、planBefore/After、redeemedAt
+- 创建 src/lib/redeem.ts 工具库：
+  * generateRedeemCode - 生成 12 位兑换码（去除易混淆字符 0/O/I/1，格式 XXXX-XXXX-XXXX）
+  * generateUniqueCodes - 批量生成不重复兑换码（数据库查重）
+  * calculatePlanExpiry - 计算会员到期时间（顺延策略）
+  * describeReward - 奖励描述文案
+- 创建 /api/admin/redeem-codes GET/POST/PATCH/DELETE 路由：
+  * GET - 分页查询兑换码列表 + 批次列表 + 统计（总/未使用/已使用/已禁用）
+  * POST - 批量生成（1-1000 个，支持 token/plan 两种奖励，可选过期时间和批次备注）
+  * PATCH - 禁用/启用单个兑换码（已使用不可启用）
+  * DELETE - 删除整个批次的未使用兑换码
+- 创建 /api/redeem POST/GET 路由：
+  * POST - 用户兑换（标准化输入：去空格、去连字符、转大写；数据库兼容两种格式）
+    - 检查兑换码存在性、状态（used/disabled）、过期
+    - 执行奖励：token 直接增加余额，plan 升级会员并赠送对应 Token（月卡 50000，年卡 500000）
+    - 标记兑换码为已使用，记录兑换历史（含前后余额快照）
+  * GET - 当前用户的兑换历史
+- 管理员后台新增「兑换码」Tab（第 7 个 Tab）：
+  * 4 个统计卡片（总/未使用/已使用/已禁用）
+  * 「批量生成兑换码」按钮 + 搜索框 + 状态筛选 + 批次筛选
+  * 最近批次列表（点击查看详情）
+  * 兑换码表格（兑换码+复制按钮、奖励、状态、批次、使用时间、禁用/启用操作）
+  * 生成对话框：奖励类型切换（Token/会员）+ 数量快捷选择 + 会员类型/天数 + 过期时间 + 批次备注
+  * 生成结果对话框：列出所有生成的兑换码 + 复制全部按钮
+- 用户中心新增「兑换码」卡片（位于充值套餐与充值记录之间）：
+  * 紫粉渐变背景突出显示
+  * 输入框（自动转大写）+ 立即兑换按钮
+  * 兑换记录展开/收起（显示兑换码、奖励、时间、前后余额变化）
+- ESLint 通过
+- Agent Browser 端到端验证：
+  * 管理员登录后看到「兑换码」Tab（共 7 个 Tab）
+  * 点击「批量生成兑换码」打开对话框
+  * 默认 Token 类型 50000 数量 10，点击生成成功
+  * 返回 10 个兑换码（如 CMK7-EASM-48X5、A74V-TKMQ-UCXU 等）
+  * 切换到「会员权益」类型，选「年卡 365 天」，数量 5，生成成功
+  * 兑换码列表完整显示（兑换码+奖励+状态+批次+使用时间+操作）
+  * 切换到用户中心，看到兑换码卡片
+  * 输入 CMK7-EASM-48X5 兑换成功，Token 余额从 1,596,648 增至 1,646,648
+  * 输入 PW5V-2624-ZHSG（年卡）兑换成功，获得年卡 365 天 + 500000 Token
+  * 兑换记录正确显示两条记录（含前后余额变化）
+  * 尝试已使用的兑换码：返回「该兑换码已被使用」
+  * 尝试不存在的兑换码：返回「兑换码不存在」
+  * 测试格式不敏感：输入小写无连字符「a74vtkmqucxu」也能成功兑换
+  * 管理员后台列表中已使用的兑换码状态变为「已使用」
+
+Stage Summary:
+- 兑换码系统完整实现，覆盖管理员生成 + 用户兑换 + 历史记录全流程
+- 数据库：新增 RedeemCode 和 RedeemHistory 表
+- 工具库：src/lib/redeem.ts 封装兑换码生成与校验
+- API：管理员 4 个路由 + 用户 2 个路由
+- 前端：管理员后台新增 Tab + 用户中心新增兑换卡片
+- 兑换码特性：
+  * 12 位字符（去除易混淆字符 0/O/I/1）
+  * 格式不敏感（大小写、有无连字符均可）
+  * 支持两种奖励：Token 余额 / 会员权益
+  * 支持批次管理（batchId + batchNote）
+  * 支持过期时间（可选）
+  * 支持禁用/启用
+  * 完整的使用历史记录（前后余额快照）

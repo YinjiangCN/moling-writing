@@ -17,6 +17,13 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Users,
   BookOpen,
   CreditCard,
@@ -36,10 +43,13 @@ import {
   Send,
   Save,
   Server,
+  Ticket,
+  Copy,
+  Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-type AdminTab = 'overview' | 'users' | 'novels' | 'orders' | 'messages' | 'email'
+type AdminTab = 'overview' | 'users' | 'novels' | 'orders' | 'messages' | 'email' | 'redeem'
 
 export function AdminView() {
   const [tab, setTab] = useState<AdminTab>('overview')
@@ -58,7 +68,7 @@ export function AdminView() {
         </div>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as AdminTab)}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-7 h-auto">
             <TabsTrigger value="overview" className="gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" />
               总览
@@ -81,7 +91,11 @@ export function AdminView() {
             </TabsTrigger>
             <TabsTrigger value="email" className="gap-1.5">
               <Mail className="w-3.5 h-3.5" />
-              邮箱配置
+              邮箱
+            </TabsTrigger>
+            <TabsTrigger value="redeem" className="gap-1.5">
+              <Ticket className="w-3.5 h-3.5" />
+              兑换码
             </TabsTrigger>
           </TabsList>
 
@@ -102,6 +116,9 @@ export function AdminView() {
           </TabsContent>
           <TabsContent value="email" className="mt-4">
             <EmailConfigTab />
+          </TabsContent>
+          <TabsContent value="redeem" className="mt-4">
+            <RedeemCodesTab />
           </TabsContent>
         </Tabs>
       </div>
@@ -1152,6 +1169,540 @@ function EmailConfigTab() {
           </CardContent>
         </Card>
       )}
+    </div>
+  )
+}
+
+// ============ 兑换码管理 ============
+function RedeemCodesTab() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [batchFilter, setBatchFilter] = useState('')
+  const [search, setSearch] = useState('')
+
+  // 生成表单
+  const [genOpen, setGenOpen] = useState(false)
+  const [genCount, setGenCount] = useState(10)
+  const [genRewardType, setGenRewardType] = useState<'token' | 'plan'>('token')
+  const [genTokenAmount, setGenTokenAmount] = useState(50000)
+  const [genPlanReward, setGenPlanReward] = useState<'pro' | 'year'>('pro')
+  const [genPlanDays, setGenPlanDays] = useState(30)
+  const [genBatchNote, setGenBatchNote] = useState('')
+  const [genExpiresAt, setGenExpiresAt] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [genResult, setGenResult] = useState<any>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params: any = { page, pageSize: 20 }
+      if (statusFilter) params.status = statusFilter
+      if (batchFilter) params.batchId = batchFilter
+      if (search) params.search = search
+      const r = await api('/api/admin/redeem-codes', { params })
+      setData(r)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [page, statusFilter, batchFilter, search])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const handleGenerate = async () => {
+    if (genCount < 1 || genCount > 1000) {
+      toast.error('数量必须在 1-1000 之间')
+      return
+    }
+    if (genRewardType === 'token' && genTokenAmount <= 0) {
+      toast.error('Token 数量必须大于 0')
+      return
+    }
+    if (genRewardType === 'plan' && genPlanDays <= 0) {
+      toast.error('会员天数必须大于 0')
+      return
+    }
+    setGenerating(true)
+    try {
+      const body: any = {
+        count: Number(genCount),
+        rewardType: genRewardType,
+        batchNote: genBatchNote,
+        expiresAt: genExpiresAt || null,
+      }
+      if (genRewardType === 'token') body.tokenAmount = Number(genTokenAmount)
+      else {
+        body.planReward = genPlanReward
+        body.planDays = Number(genPlanDays)
+      }
+      const r = await api('/api/admin/redeem-codes', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      setGenResult(r)
+      toast.success(r.message)
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleAction = async (id: string, action: 'disable' | 'enable') => {
+    try {
+      await api('/api/admin/redeem-codes', {
+        method: 'PATCH',
+        body: JSON.stringify({ id, action }),
+      })
+      toast.success(action === 'disable' ? '已禁用' : '已启用')
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  const handleDeleteBatch = async (batchId: string) => {
+    if (!confirm('确认删除该批次所有未使用的兑换码？')) return
+    try {
+      const r = await api(`/api/admin/redeem-codes?batchId=${batchId}`, { method: 'DELETE' })
+      toast.success(r.message)
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success('已复制到剪贴板')
+    })
+  }
+
+  const copyAllCodes = () => {
+    if (!genResult?.codes?.length) return
+    const text = genResult.codes.join('\n')
+    copyToClipboard(text)
+  }
+
+  if (loading && !data) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* 统计卡片 */}
+      {data?.stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground">总兑换码</div>
+              <div className="text-xl font-bold">{data.stats.total}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground">未使用</div>
+              <div className="text-xl font-bold text-emerald-600">{data.stats.unused}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground">已使用</div>
+              <div className="text-xl font-bold text-blue-600">{data.stats.used}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground">已禁用</div>
+              <div className="text-xl font-bold text-red-600">{data.stats.disabled}</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 操作栏 */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <Button onClick={() => setGenOpen(true)} className="gap-1.5">
+          <Plus className="w-4 h-4" />
+          批量生成兑换码
+        </Button>
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            placeholder="搜索兑换码 / 批次备注"
+            className="pl-9"
+          />
+        </div>
+        <Select
+          value={statusFilter || 'all'}
+          onValueChange={(v) => {
+            setStatusFilter(v === 'all' ? '' : v)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="状态" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部状态</SelectItem>
+            <SelectItem value="unused">未使用</SelectItem>
+            <SelectItem value="used">已使用</SelectItem>
+            <SelectItem value="disabled">已禁用</SelectItem>
+          </SelectContent>
+        </Select>
+        {batchFilter && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBatchFilter('')}
+            className="gap-1.5"
+          >
+            清除批次筛选
+          </Button>
+        )}
+      </div>
+
+      {/* 批次列表 */}
+      {data?.batches?.length > 0 && !batchFilter && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">最近批次</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.batches.slice(0, 5).map((b: any) => (
+              <div
+                key={b.batchId}
+                className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono text-xs truncate">{b.batchId}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {b.batchNote || '无备注'} · {b._count.id} 个
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setBatchFilter(b.batchId)
+                    setPage(1)
+                  }}
+                >
+                  查看
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 兑换码表格 */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-xs sticky top-0">
+                <tr>
+                  <th className="text-left p-3">兑换码</th>
+                  <th className="text-left p-3">奖励</th>
+                  <th className="text-left p-3">状态</th>
+                  <th className="text-left p-3">批次</th>
+                  <th className="text-left p-3">使用时间</th>
+                  <th className="text-left p-3">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data?.codes?.map((c: any) => (
+                  <tr key={c.id} className="border-t hover:bg-muted/30">
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-medium tracking-wider">{c.code}</span>
+                        <button
+                          onClick={() => copyToClipboard(c.code)}
+                          className="opacity-50 hover:opacity-100"
+                          title="复制"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="p-3 text-xs">
+                      <Badge variant="outline" className={c.rewardType === 'token' ? 'text-amber-600' : 'text-violet-600'}>
+                        {c.rewardDesc}
+                      </Badge>
+                    </td>
+                    <td className="p-3">
+                      {c.status === 'unused' ? (
+                        <Badge variant="outline" className="text-emerald-600 border-emerald-300 text-xs">
+                          未使用
+                        </Badge>
+                      ) : c.status === 'used' ? (
+                        <Badge variant="outline" className="text-blue-600 border-blue-300 text-xs">
+                          已使用
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-red-600 border-red-300 text-xs">
+                          已禁用
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="p-3 text-xs text-muted-foreground">
+                      {c.batchNote || c.batchId?.slice(-8) || '-'}
+                    </td>
+                    <td className="p-3 text-xs text-muted-foreground">
+                      {c.usedAt ? formatTime(c.usedAt) : '-'}
+                    </td>
+                    <td className="p-3">
+                      {c.status === 'unused' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-red-600"
+                          onClick={() => handleAction(c.id, 'disable')}
+                        >
+                          禁用
+                        </Button>
+                      )}
+                      {c.status === 'disabled' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-emerald-600"
+                          onClick={() => handleAction(c.id, 'enable')}
+                        >
+                          启用
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {data?.codes?.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      暂无兑换码
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 分页 */}
+      {data?.totalPages > 1 && (
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            上一页
+          </Button>
+          <span className="text-sm py-1">{page} / {data.totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
+            下一页
+          </Button>
+        </div>
+      )}
+
+      {/* 生成对话框 */}
+      <Dialog open={genOpen} onOpenChange={(v) => {
+        setGenOpen(v)
+        if (!v) setGenResult(null)
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ticket className="w-4 h-4" />
+              批量生成兑换码
+            </DialogTitle>
+          </DialogHeader>
+
+          {genResult ? (
+            <div className="space-y-3 py-2">
+              <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded p-3 text-sm text-emerald-700 dark:text-emerald-300">
+                ✓ {genResult.message}（批次 ID：{genResult.batchId.slice(-12)}）
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>生成的兑换码列表</Label>
+                  <Button size="sm" variant="outline" onClick={copyAllCodes} className="gap-1.5">
+                    <Copy className="w-3 h-3" />
+                    复制全部
+                  </Button>
+                </div>
+                <div className="bg-muted/50 rounded p-3 max-h-60 overflow-y-auto">
+                  {genResult.codes.map((c: string, i: number) => (
+                    <div key={i} className="font-mono text-sm py-0.5 flex items-center justify-between">
+                      <span>{c}</span>
+                      <button
+                        onClick={() => copyToClipboard(c)}
+                        className="opacity-50 hover:opacity-100"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setGenOpen(false); setGenResult(null) }}>
+                  完成
+                </Button>
+                <Button onClick={() => setGenResult(null)}>继续生成</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label>奖励类型</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={genRewardType === 'token' ? 'default' : 'outline'}
+                      onClick={() => setGenRewardType('token')}
+                      className="gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Token 余额
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={genRewardType === 'plan' ? 'default' : 'outline'}
+                      onClick={() => setGenRewardType('plan')}
+                      className="gap-1.5"
+                    >
+                      <Crown className="w-3.5 h-3.5" />
+                      会员权益
+                    </Button>
+                  </div>
+                </div>
+
+                {genRewardType === 'token' ? (
+                  <div className="space-y-2">
+                    <Label>每个兑换码的 Token 数量</Label>
+                    <Input
+                      type="number"
+                      value={genTokenAmount}
+                      onChange={(e) => setGenTokenAmount(Number(e.target.value))}
+                      placeholder="如 50000"
+                    />
+                    <div className="flex gap-2 text-xs">
+                      {[10000, 50000, 100000, 500000].map((n) => (
+                        <Button
+                          key={n}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setGenTokenAmount(n)}
+                        >
+                          {n.toLocaleString()}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>会员类型</Label>
+                      <Select value={genPlanReward} onValueChange={(v) => setGenPlanReward(v as any)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pro">月卡 (pro)</SelectItem>
+                          <SelectItem value="year">年卡 (year)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>会员天数</Label>
+                      <Input
+                        type="number"
+                        value={genPlanDays}
+                        onChange={(e) => setGenPlanDays(Number(e.target.value))}
+                        placeholder="如 30"
+                      />
+                    </div>
+                    <div className="col-span-2 flex gap-2 text-xs">
+                      <Button variant="outline" size="sm" onClick={() => { setGenPlanReward('pro'); setGenPlanDays(30) }}>
+                        月卡 30 天
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => { setGenPlanReward('pro'); setGenPlanDays(90) }}>
+                        季卡 90 天
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => { setGenPlanReward('year'); setGenPlanDays(365) }}>
+                        年卡 365 天
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>生成数量（1-1000）</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={genCount}
+                      onChange={(e) => setGenCount(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>过期时间（可选）</Label>
+                    <Input
+                      type="datetime-local"
+                      value={genExpiresAt}
+                      onChange={(e) => setGenExpiresAt(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>批次备注（可选）</Label>
+                  <Input
+                    value={genBatchNote}
+                    onChange={(e) => setGenBatchNote(e.target.value)}
+                    placeholder="如：双十一活动 / 内测福利"
+                  />
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded p-3 text-xs text-blue-800 dark:text-blue-200">
+                  预览：将生成 <b>{genCount}</b> 个兑换码，每个奖励为
+                  <b>
+                    {genRewardType === 'token'
+                      ? ` ${genTokenAmount.toLocaleString()} Token`
+                      : ` ${genPlanReward === 'year' ? '年卡' : '月卡'}会员 ${genPlanDays} 天`}
+                  </b>
+                  {genExpiresAt && `，过期时间 ${new Date(genExpiresAt).toLocaleString('zh-CN')}`}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setGenOpen(false)}>
+                  取消
+                </Button>
+                <Button onClick={handleGenerate} disabled={generating} className="gap-1.5">
+                  {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  生成 {genCount} 个
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
