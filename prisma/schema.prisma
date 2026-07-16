@@ -1,0 +1,169 @@
+// AI 写小说平台 - Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 用户与计费 ============
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  penName      String?
+  avatar       String?
+  tokens       Int      @default(100000) // Token 余额
+  plan         String   @default("free") // free / pro / year
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  folders      Folder[]
+  novels       Novel[]
+  characters   Character[]
+  worldviews   Worldview[]
+  items        Item[]
+  chatMessages ChatMessage[]
+  dailyStats   DailyStat[]
+}
+
+// 每日创作统计 (热力图用)
+model DailyStat {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // YYYY-MM-DD
+  words     Int      @default(0)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+// ============ 文件夹管理 ============
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("slate")
+  sortOrder Int      @default(0)
+  userId    String
+  parentId  String?  // 支持多级文件夹
+  parent    Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderTree")
+  novels    Novel[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============ 小说 ============
+model Novel {
+  id          String   @id @default(cuid())
+  title       String
+  cover       String?
+  author      String?
+  genre       String   @default("玄幻") // 玄幻/言情/科幻/悬疑/历史/都市
+  tags        String   @default("") // 逗号分隔
+  synopsis    String?  // 简介
+  outline     String?  // 大纲
+  status      String   @default("ongoing") // ongoing / completed / hiatus
+  totalWords  Int      @default(0)
+  folderId    String?
+  folder      Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  volumes     Volume[]
+  chapters    Chapter[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 卷
+model Volume {
+  id        String   @id @default(cuid())
+  title     String
+  sortOrder Int      @default(0)
+  isOutline Boolean  @default(false) // 大纲卷
+  novelId   String
+  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  chapters  Chapter[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 章节/节
+model Chapter {
+  id         String   @id @default(cuid())
+  title      String
+  content    String   @default("")
+  summary    String?  // 章节核心事件摘要
+  words      Int      @default(0)
+  status     String   @default("draft") // draft / polishing / final
+  sortOrder  Int      @default(0)
+  volumeId   String
+  volume     Volume   @relation(fields: [volumeId], references: [id], onDelete: Cascade)
+  novelId    String
+  novel      Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ============ 设定库 ============
+// 角色卡
+model Character {
+  id         String   @id @default(cuid())
+  name       String
+  avatar     String?
+  appearance String?
+  personality String?
+  background String?
+  abilities  String? // 功法/技能
+  relations  String? // 人物关系 JSON
+  novelId    String? // 可绑定到具体小说，也可全局
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// 世界观/地图
+model Worldview {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("geography") // geography / faction / history
+  description String?
+  novelId     String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 道具/功法
+model Item {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("item") // item / skill
+  attributes  String?  // 属性 JSON
+  effect      String?
+  novelId     String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ AI 对话历史 ============
+model ChatMessage {
+  id        String   @id @default(cuid())
+  role      String   // user / assistant / system
+  content   String
+  preset    String?  // 使用的预设指令 ID
+  novelId   String?  // 关联的小说
+  chapterId String?  // 关联的章节
+  tokensUsed Int     @default(0)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
