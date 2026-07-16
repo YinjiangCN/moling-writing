@@ -7,6 +7,7 @@ import { ChapterTree } from './chapter-tree'
 import { EditorPanel } from './editor-panel'
 import { AiAssistant } from '@/components/ai/ai-assistant'
 import { AutoSerialPanel } from './auto-serial-panel'
+import { EditorToolbar } from './editor-toolbar'
 import { Button } from '@/components/ui/button'
 import { PanelLeft, PanelRight, Eye, Moon, Sun, Type, Sparkles } from 'lucide-react'
 import {
@@ -241,6 +242,15 @@ export function EditorView() {
 
         <div className="ml-auto flex items-center gap-2">
           <AutoSerialPanel novelId={novel.id} />
+          <EditorToolbar
+            novelId={novel.id}
+            novelTitle={novel.title}
+            chapterId={currentChapterId}
+            onJumpChapter={setCurrentChapter}
+            onContentReload={loadNovel}
+            wordGoal={(novel as any).wordGoal}
+            totalWords={totalWords}
+          />
 
           {saving ? (
             <span className="text-amber-500 flex items-center gap-1">
@@ -263,6 +273,15 @@ export function EditorView() {
             title="打字机模式"
           >
             <Type className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-7 w-7 ${editorMode === 'focus' ? 'bg-secondary' : ''}`}
+            onClick={() => setEditorMode(editorMode === 'focus' ? 'normal' : 'focus')}
+            title="专注模式（高亮当前段落）"
+          >
+            <Eye className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"

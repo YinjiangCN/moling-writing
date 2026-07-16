@@ -274,8 +274,22 @@ export function EditorPanel({
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertMarkdown('- ')}>
           <List className="w-3.5 h-3.5" />
         </Button>
-        <div className="ml-auto text-xs text-muted-foreground">
-          {aiLoading ? 'AI 处理中...' : `${chapter.words} 字`}
+        <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+          {aiLoading ? (
+            <span className="text-violet-500 flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              AI 处理中...
+            </span>
+          ) : (
+            <>
+              <span>{chapter.words} 字</span>
+              {chapter.words > 0 && (
+                <span className="text-muted-foreground/70">
+                  约 {Math.ceil(chapter.words / 400)} 分钟阅读
+                </span>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -289,7 +303,21 @@ export function EditorPanel({
           onScroll={handleScroll}
           onClick={handleSelect}
           onKeyUp={handleSelect}
-          placeholder="开始你的创作... 选中文字可触发 AI 润色/扩写/缩写菜单"
+          onKeyDown={(e) => {
+            // 快捷键：Ctrl+B 粗体, Ctrl+I 斜体, Ctrl+S 保存（防默认）
+            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+              e.preventDefault()
+              insertMarkdown('**', '**')
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+              e.preventDefault()
+              insertMarkdown('*', '*')
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+              e.preventDefault()
+              // 自动保存已在 editor-view 中防抖处理，这里只提示
+              toast.success('已保存')
+            }
+          }}
+          placeholder="开始你的创作... 选中文字可触发 AI 润色/扩写/缩写菜单（Ctrl+B 粗体 / Ctrl+I 斜体）"
           className={`w-full h-full resize-none bg-background px-12 py-8 outline-none text-base leading-7 ${
             editorMode === 'focus'
               ? 'focus-within:[&::-webkit-scrollbar]:w-0'

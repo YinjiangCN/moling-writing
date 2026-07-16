@@ -73,10 +73,16 @@ export async function PATCH(req: NextRequest) {
   const { id, content, title, status, sortOrder, summary, volumeId } = body
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })
 
+  // 先取出旧章节，用于后续计算字数增量
+  const oldChapter = await db.chapter.findUnique({ where: { id } })
+  if (!oldChapter) return NextResponse.json({ error: '未找到章节' }, { status: 404 })
+
   const data: any = {}
+  let newWords: number | null = null
   if (content !== undefined) {
     data.content = content
-    data.words = content.replace(/\s/g, '').length
+    newWords = content.replace(/\s/g, '').length
+    data.words = newWords
   }
   if (title !== undefined) data.title = title
   if (status !== undefined) data.status = status
@@ -86,7 +92,7 @@ export async function PATCH(req: NextRequest) {
 
   const chapter = await db.chapter.update({ where: { id }, data })
 
-  if (content !== undefined && chapter.novelId) {
+  if (newWords !== null && chapter.novelId) {
     const agg = await db.chapter.aggregate({
       where: { novelId: chapter.novelId },
       _sum: { words: true },
@@ -96,20 +102,22 @@ export async function PATCH(req: NextRequest) {
       data: { totalWords: agg._sum.words || 0 },
     })
 
+    // 计算今日增量：新字数 - 旧字数（用 update 前的 oldChapter）
+    const delta = Math.max(0, newWords - (oldChapter.words || 0))
     const today = new Date().toISOString().slice(0, 10)
     const user = await db.user.findFirst({ where: { novels: { some: { id: chapter.novelId } } } })
-    if (user) {
+    if (user && delta > 0) {
       const existing = await db.dailyStat.findUnique({
         where: { userId_date: { userId: user.id, date: today } },
       })
       if (existing) {
         await db.dailyStat.update({
           where: { id: existing.id },
-          data: { words: existing.words + Math.max(0, (data.words || 0) - (chapter.words || 0)) },
+          data: { words: existing.words + delta },
         })
       } else {
         await db.dailyStat.create({
-          data: { userId: user.id, date: today, words: data.words || 0 },
+          data: { userId: user.id, date: today, words: delta },
         })
       }
     }

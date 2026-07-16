@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireSessionOr401 } from '@/lib/auth'
 
-// GET /api/novels?folderId=xxx 或 /api/novels?id=xxx
+// GET /api/novels?folderId=xxx 或 /api/novels?id=xxx 或 /api/novels?trash=true
 export async function GET(req: NextRequest) {
   const session = await requireSessionOr401()
   if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const id = url.searchParams.get('id')
   const folderId = url.searchParams.get('folderId')
+  const trash = url.searchParams.get('trash') === 'true'
 
   if (id) {
     const novel = await db.novel.findUnique({
@@ -31,7 +32,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ novel })
   }
 
-  const where: any = { userId: user.id }
+  // 回收站列表
+  if (trash) {
+    const novels = await db.novel.findMany({
+      where: { userId: user.id, deleted: true },
+      orderBy: { deletedAt: 'desc' },
+    })
+    return NextResponse.json({ novels })
+  }
+
+  const where: any = { userId: user.id, deleted: false }
   if (folderId) where.folderId = folderId
   const novels = await db.novel.findMany({
     where,
@@ -78,11 +88,23 @@ export async function PATCH(req: NextRequest) {
   const session = await requireSessionOr401()
   if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
 
+  // 恢复删除：PATCH /api/novels?id=xxx&restore=true
+  const url = new URL(req.url)
+  if (url.searchParams.get('restore') === 'true') {
+    const id = url.searchParams.get('id')
+    if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })
+    await db.novel.update({
+      where: { id },
+      data: { deleted: false, deletedAt: null },
+    })
+    return NextResponse.json({ ok: true, message: '已从回收站恢复' })
+  }
+
   const body = await req.json()
   const { id, ...data } = body
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })
 
-  const allowed = ['title', 'cover', 'author', 'genre', 'tags', 'synopsis', 'outline', 'status', 'folderId']
+  const allowed = ['title', 'cover', 'author', 'genre', 'tags', 'synopsis', 'outline', 'status', 'folderId', 'wordGoal']
   const updateData: any = {}
   for (const key of allowed) {
     if (data[key] !== undefined) updateData[key] = data[key]
@@ -92,13 +114,27 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ novel })
 }
 
+// 软删除：DELETE /api/novels?id=xxx 移入回收站
+//        DELETE /api/novels?id=xxx&purge=true 永久删除
+// PATCH  /api/novels?id=xxx&restore=true 从回收站恢复
 export async function DELETE(req: NextRequest) {
   const session = await requireSessionOr401()
   if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
 
   const url = new URL(req.url)
   const id = url.searchParams.get('id')
+  const purge = url.searchParams.get('purge') === 'true'
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })
-  await db.novel.delete({ where: { id } })
-  return NextResponse.json({ ok: true })
+
+  if (purge) {
+    await db.novel.delete({ where: { id } })
+    return NextResponse.json({ ok: true, message: '已永久删除' })
+  }
+
+  // 软删除
+  await db.novel.update({
+    where: { id },
+    data: { deleted: true, deletedAt: new Date() },
+  })
+  return NextResponse.json({ ok: true, message: '已移入回收站，30 天内可恢复' })
 }

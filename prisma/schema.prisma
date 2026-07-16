@@ -115,6 +115,11 @@ model Novel {
   volumes     Volume[]
   chapters    Chapter[]
   autoSerials AutoSerial[]
+  // 软删除（回收站）
+  deleted     Boolean       @default(false)
+  deletedAt   DateTime?
+  // 字数目标
+  wordGoal   Int           @default(0) // 全书字数目标，0=未设置
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -148,6 +153,24 @@ model Chapter {
   novel      Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  revisions  ChapterRevision[]
+}
+
+// 章节版本历史
+model ChapterRevision {
+  id         String   @id @default(cuid())
+  chapterId  String
+  content    String
+  words      Int
+  title      String
+  // 创建快照的原因
+  reason     String   @default("manual") // manual / auto / ai
+  createdAt  DateTime @default(now())
+
+  chapter    Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([chapterId, createdAt])
 }
 
 // ============ 设定库 ============
