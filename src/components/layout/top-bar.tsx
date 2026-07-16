@@ -1,7 +1,7 @@
 'use client'
 
 import { useAppStore } from '@/lib/store'
-import { LayoutGrid, Settings, User, Sparkles, PenLine, Shield, LogOut, Loader2, Bell, Megaphone } from 'lucide-react'
+import { LayoutGrid, Settings, User, Sparkles, PenLine, Shield, LogOut, Loader2, Bell, Megaphone, BookOpen } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
 import { MessagesDialog } from '@/components/user/messages-dialog'
 import { api } from '@/lib/helpers'
@@ -105,8 +105,9 @@ export function TopBar() {
     }
   }
 
-  const navs: { id: 'workspace' | 'settings' | 'user' | 'admin'; label: string; icon: any; adminOnly?: boolean }[] = [
+  const navs: { id: 'workspace' | 'plaza' | 'settings' | 'user' | 'admin'; label: string; icon: any; adminOnly?: boolean }[] = [
     { id: 'workspace', label: '工作台', icon: LayoutGrid },
+    { id: 'plaza', label: '广场', icon: BookOpen },
     { id: 'settings', label: '设定库', icon: Settings },
     { id: 'user', label: '用户中心', icon: User },
     { id: 'admin', label: '管理后台', icon: Shield, adminOnly: true },

@@ -19,6 +19,13 @@ import {
 } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Search,
   Download,
   History,
@@ -31,6 +38,9 @@ import {
   Trash2,
   ChevronRight,
   Archive,
+  Globe,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
@@ -482,6 +492,185 @@ export function EditorToolbar({ novelId, novelTitle, chapterId, onJumpChapter, o
       <ExportTool novelId={novelId} novelTitle={novelTitle} chapterId={chapterId} />
       <HistoryTool chapterId={chapterId} onReload={onContentReload} />
       <WordGoalTool novelId={novelId} wordGoal={wordGoal || 0} totalWords={totalWords || 0} />
+      <PublishTool novelId={novelId} novelTitle={novelTitle} />
     </>
+  )
+}
+
+// ============ 发布到广场 ============
+function PublishTool({ novelId, novelTitle }: { novelId: string; novelTitle: string }) {
+  const [open, setOpen] = useState(false)
+  const [publication, setPublication] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [title, setTitle] = useState(novelTitle)
+  const [synopsis, setSynopsis] = useState('')
+  const [category, setCategory] = useState('玄幻')
+  const [tags, setTags] = useState('')
+  const [publishing, setPublishing] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await api<{ publication: any }>(`/api/publications?novelId=${novelId}`)
+      setPublication(r.publication)
+      if (r.publication) {
+        setTitle(r.publication.title)
+        setSynopsis(r.publication.synopsis)
+        setCategory(r.publication.category)
+        setTags(r.publication.tags)
+      }
+    } catch {}
+    finally { setLoading(false) }
+  }, [novelId])
+
+  useEffect(() => {
+    if (open) load()
+  }, [open, load])
+
+  const handlePublish = async () => {
+    if (!title.trim()) {
+      toast.error('请输入标题')
+      return
+    }
+    setPublishing(true)
+    try {
+      if (publication) {
+        // 更新
+        await api('/api/publications', {
+          method: 'PATCH',
+          body: JSON.stringify({ id: publication.id, title, synopsis, category, tags }),
+        })
+        toast.success('已更新')
+      } else {
+        // 发布
+        const r = await api('/api/publications', {
+          method: 'POST',
+          body: JSON.stringify({ novelId, title, synopsis, category, tags }),
+        })
+        toast.success(r.message)
+      }
+      setOpen(false)
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  const handleToggleStatus = async () => {
+    if (!publication) return
+    const newStatus = publication.status === 'published' ? 'hidden' : 'published'
+    try {
+      await api('/api/publications', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: publication.id, status: newStatus }),
+      })
+      toast.success(newStatus === 'hidden' ? '已隐藏' : '已重新发布')
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  const handleUnpublish = async () => {
+    if (!publication) return
+    if (!confirm('确认从广场撤回？读者将无法再看到此作品。')) return
+    try {
+      await api(`/api/publications?id=${publication.id}`, { method: 'DELETE' })
+      toast.success('已撤回')
+      setOpen(false)
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          title="发布到广场"
+        >
+          <Globe className="w-3.5 h-3.5" />
+          {publication ? '已发布' : '发布'}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80" align="end">
+        {loading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="w-4 h-4 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-sm font-medium flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5" />
+              发布到作品广场
+            </div>
+
+            {publication && (
+              <div className="bg-muted/30 rounded p-2 text-xs space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={
+                    publication.status === 'published'
+                      ? 'text-emerald-600 border-emerald-300'
+                      : 'text-amber-600 border-amber-300'
+                  }>
+                    {publication.status === 'published' ? '已发布' : '已隐藏'}
+                  </Badge>
+                  <span className="text-muted-foreground">浏览 {publication.viewCount} · 点赞 {publication.likeCount} · 收藏 {publication.collectCount}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>广场标题</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="书名" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>简介</Label>
+              <Input value={synopsis} onChange={(e) => setSynopsis(e.target.value)} placeholder="一句话吸引读者" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label>分类</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['玄幻', '言情', '科幻', '悬疑', '历史', '都市', '武侠', '游戏', '奇幻'].map((g) => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>标签</Label>
+                <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="逗号分隔" className="h-8 text-xs" />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button size="sm" className="flex-1 gap-1.5" onClick={handlePublish} disabled={publishing}>
+                {publishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                {publication ? '更新' : '发布'}
+              </Button>
+              {publication && (
+                <>
+                  <Button size="sm" variant="outline" onClick={handleToggleStatus} title={publication.status === 'published' ? '隐藏' : '重新发布'}>
+                    {publication.status === 'published' ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-red-600" onClick={handleUnpublish} title="撤回">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   )
 }

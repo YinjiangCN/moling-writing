@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Loader2,
   Wand2,
+  RotateCcw,
 } from 'lucide-react'
 import {
   Dialog,
@@ -183,12 +184,52 @@ export function WorkspaceView() {
   }
 
   const handleDeleteNovel = async (id: string) => {
-    if (!confirm('确认删除这本小说？该操作可在回收站恢复（演示版直接删除）。')) return
+    if (!confirm('确认删除这本小说？将移入回收站，30 天内可恢复。')) return
     try {
       await api(`/api/novels?id=${id}`, { method: 'DELETE' })
       toast.success('已移入回收站')
       loadNovels()
       loadStats()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  // 回收站
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [trashNovels, setTrashNovels] = useState<any[]>([])
+  const [trashLoading, setTrashLoading] = useState(false)
+
+  const loadTrash = async () => {
+    setTrashLoading(true)
+    try {
+      const r = await api<{ novels: any[] }>('/api/novels?trash=true')
+      setTrashNovels(r.novels)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setTrashLoading(false)
+    }
+  }
+
+  const handleRestore = async (id: string) => {
+    try {
+      await api(`/api/novels?id=${id}&restore=true`, { method: 'PATCH' })
+      toast.success('已从回收站恢复')
+      loadTrash()
+      loadNovels()
+      loadStats()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  const handlePurge = async (id: string, title: string) => {
+    if (!confirm(`确认永久删除「${title}」？此操作不可恢复！`)) return
+    try {
+      await api(`/api/novels?id=${id}&purge=true`, { method: 'DELETE' })
+      toast.success('已永久删除')
+      loadTrash()
     } catch (e: any) {
       toast.error(e.message)
     }
@@ -404,6 +445,15 @@ export function WorkspaceView() {
                 点击右上角 + 创建
               </div>
             )}
+
+            {/* 回收站入口 */}
+            <button
+              onClick={() => { setTrashOpen(true); loadTrash() }}
+              className="w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-muted transition text-muted-foreground"
+            >
+              <Trash2 className="w-4 h-4" />
+              回收站
+            </button>
           </div>
 
           {/* 小说卡片网格 */}
@@ -509,6 +559,72 @@ export function WorkspaceView() {
           openNovel(id)
         }}
       />
+
+      {/* 回收站对话框 */}
+      <Dialog open={trashOpen} onOpenChange={setTrashOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-muted-foreground" />
+              回收站
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {trashLoading ? (
+              <div className="text-center py-8 text-muted-foreground">加载中...</div>
+            ) : trashNovels.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Trash2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">回收站为空</p>
+              </div>
+            ) : (
+              trashNovels.map((n) => (
+                <div key={n.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                  <div className="w-10 h-14 rounded bg-gradient-to-br from-violet-500/20 to-pink-500/20 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-violet-300/60">
+                      {n.title.slice(0, 2)}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{n.title}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {n.genre} · {formatWords(n.totalWords)} 字
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      删除时间：{n.deletedAt ? new Date(n.deletedAt).toLocaleString('zh-CN') : '-'}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => handleRestore(n.id)}
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      恢复
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-red-600"
+                      onClick={() => handlePurge(n.id, n.title)}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      永久删除
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrashOpen(false)}>
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

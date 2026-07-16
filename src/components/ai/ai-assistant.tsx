@@ -77,9 +77,17 @@ export function AiAssistant({ novelId, chapterId, onInsertText }: Props) {
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setLoading(true)
+
+    // 先创建一个空的 assistant 消息，用于流式追加
+    const assistantId = Date.now()
+    setMessages((prev) => [...prev, { role: 'assistant', content: '', preset }])
+
     try {
-      const r = await api<{ reply: string; remainingTokens: number }>('/api/ai', {
+      // 使用流式 API
+      const res = await fetch('/api/ai/stream', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           action: 'chat',
           preset: preset || undefined,
@@ -88,21 +96,80 @@ export function AiAssistant({ novelId, chapterId, onInsertText }: Props) {
           chapterId,
         }),
       })
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: r.reply, preset },
-      ])
+
+      if (res.status === 401) {
+        setMessages((prev) => {
+          const copy = [...prev]
+          copy[copy.length - 1] = { role: 'assistant', content: '登录已过期，请重新登录后继续使用 AI。' }
+          return copy
+        })
+        return
+      }
+      if (res.status === 402) {
+        const err = await res.json().catch(() => ({}))
+        setMessages((prev) => {
+          const copy = [...prev]
+          copy[copy.length - 1] = { role: 'assistant', content: err.error || 'Token 余额不足，请前往用户中心充值。' }
+          return copy
+        })
+        return
+      }
+      if (!res.ok || !res.body) {
+        throw new Error('AI 调用失败')
+      }
+
+      // 读取 SSE 流
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullContent = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // 按行处理
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            if (!data) continue
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.delta) {
+                fullContent += parsed.delta
+                // 更新最后一条消息
+                setMessages((prev) => {
+                  const copy = [...prev]
+                  copy[copy.length - 1] = { role: 'assistant', content: fullContent, preset }
+                  return copy
+                })
+              }
+              if (parsed.error) {
+                setMessages((prev) => {
+                  const copy = [...prev]
+                  copy[copy.length - 1] = { role: 'assistant', content: `出错了：${parsed.error}` }
+                  return copy
+                })
+              }
+            } catch {}
+          }
+        }
+      }
     } catch (e: any) {
-      const errorMsg =
-        e?.status === 401
-          ? '登录已过期，请重新登录后继续使用 AI。'
-          : e?.status === 402
-          ? e.reply || 'Token 余额不足，请前往用户中心充值。'
-          : `抱歉，出错了：${e.message}`
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: errorMsg },
-      ])
+      setMessages((prev) => {
+        const copy = [...prev]
+        const last = copy[copy.length - 1]
+        if (last && last.role === 'assistant' && !last.content) {
+          copy[copy.length - 1] = { role: 'assistant', content: `抱歉，出错了：${e.message}` }
+        } else {
+          copy.push({ role: 'assistant', content: `抱歉，出错了：${e.message}` })
+        }
+        return copy
+      })
     } finally {
       setLoading(false)
     }

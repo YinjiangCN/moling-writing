@@ -26,6 +26,7 @@ import {
 import { api, CHAPTER_STATUS } from '@/lib/helpers'
 import type { Chapter, NovelDetail } from './editor-view'
 import { toast } from 'sonner'
+import { MentionOverlay } from './mention-overlay'
 import {
   Popover,
   PopoverContent,
@@ -317,7 +318,7 @@ export function EditorPanel({
               toast.success('已保存')
             }
           }}
-          placeholder="开始你的创作... 选中文字可触发 AI 润色/扩写/缩写菜单（Ctrl+B 粗体 / Ctrl+I 斜体）"
+          placeholder="开始你的创作... 选中文字可触发 AI 润色/扩写/缩写菜单（Ctrl+B 粗体 / Ctrl+I 斜体 / 输入 @ 引用设定）"
           className={`w-full h-full resize-none bg-background px-12 py-8 outline-none text-base leading-7 ${
             editorMode === 'focus'
               ? 'focus-within:[&::-webkit-scrollbar]:w-0'
@@ -329,6 +330,16 @@ export function EditorPanel({
             lineHeight: '28px',
           }}
         />
+
+        {/* @ 设定引用 */}
+        {chapter && (
+          <MentionOverlay
+            novelId={novel.id}
+            textareaRef={textareaRef}
+            content={chapter.content}
+            onInsert={(text) => onContentChange(text)}
+          />
+        )}
 
         {/* 内联 AI 悬浮菜单 */}
         {selectedText && inlineMenuOpen && (

@@ -40,6 +40,7 @@ import {
   FileText,
   Zap,
   RefreshCw,
+  Settings,
   Mail,
   Send,
   Save,
@@ -167,6 +168,16 @@ function OverviewTab() {
     return () => clearInterval(i)
   }, [load])
 
+  const handleBackup = (type: string) => {
+    const a = document.createElement('a')
+    a.href = `/api/admin/backup?type=${type}`
+    a.download = `moli-backup-${type}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    toast.success('已开始下载备份文件')
+  }
+
   if (loading || !data) {
     return (
       <div className="flex justify-center py-12">
@@ -249,11 +260,51 @@ function OverviewTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 数据备份 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Download className="w-4 h-4" />
+            数据备份
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground mb-3">
+            导出平台数据为 JSON 文件，可用于数据迁移或灾备。建议定期备份。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="default"
+              className="gap-1.5 bg-gradient-to-r from-violet-500 to-pink-500 hover:opacity-90"
+              onClick={() => handleBackup('all')}
+            >
+              <Download className="w-3.5 h-3.5" />
+              全量备份
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handleBackup('novels')}>
+              <BookOpen className="w-3.5 h-3.5" />
+              作品数据
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handleBackup('users')}>
+              <Users className="w-3.5 h-3.5" />
+              用户数据
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handleBackup('orders')}>
+              <CreditCard className="w-3.5 h-3.5" />
+              订单数据
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handleBackup('settings')}>
+              <Settings className="w-3.5 h-3.5" />
+              设定库数据
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
-
-// ============ 用户管理 ============
 function UsersTab() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)

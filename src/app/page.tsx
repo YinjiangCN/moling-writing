@@ -10,6 +10,7 @@ import { TopBar } from '@/components/layout/top-bar'
 import { AuthView } from '@/components/auth/auth-view'
 import { AdminView } from '@/components/admin/admin-view'
 import { AutoSerialPanel } from '@/components/editor/auto-serial-panel'
+import { PlazaView } from '@/components/plaza/plaza-view'
 
 export default function Home() {
   const { view, theme, currentNovelId, user, authLoading } = useAppStore()
@@ -55,6 +56,7 @@ export default function Home() {
       <TopBar />
       <main className="flex-1 flex overflow-hidden">
         {view === 'workspace' && <WorkspaceView />}
+        {view === 'plaza' && <PlazaView />}
         {view === 'editor' && currentNovelId && <EditorView />}
         {view === 'settings' && <SettingsLibrary />}
         {view === 'user' && <UserCenter />}

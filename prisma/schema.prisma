@@ -424,3 +424,78 @@ model RedeemHistory {
 
   @@index([userId])
 }
+
+// ============ 作品广场 ============
+// 作品发布到广场（一个 Novel 可以发布一次）
+model Publication {
+  id          String   @id @default(cuid())
+  novelId     String   @unique
+  userId      String   // 发布者
+  // 发布信息
+  title       String   // 广场展示标题（可与小说标题不同）
+  synopsis    String   // 广场简介
+  cover       String?
+  tags        String   @default("")
+  category    String   @default("玄幻") // 分类
+  // 状态
+  status      String   @default("published") // published / hidden / removed
+  featured    Boolean  @default(false) // 是否推荐
+  // 统计
+  viewCount   Int      @default(0)
+  likeCount   Int      @default(0)
+  collectCount Int     @default(0)
+  // 时间
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reads       ReadRecord[]
+  likes       PublicationLike[]
+  collects    PublicationCollect[]
+
+  @@index([status, publishedAt])
+  @@index([category])
+}
+
+// 阅读记录
+model ReadRecord {
+  id              String   @id @default(cuid())
+  publicationId   String
+  userId          String?
+  chapterId       String?
+  // 阅读进度
+  lastChapterSortOrder Int  @default(0)
+  readWords       Int      @default(0)
+  // 时间
+  lastReadAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  publication     Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@unique([publicationId, userId])
+  @@index([userId])
+}
+
+// 点赞
+model PublicationLike {
+  id            String   @id @default(cuid())
+  publicationId String
+  userId        String
+  createdAt     DateTime @default(now())
+
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@unique([publicationId, userId])
+}
+
+// 收藏
+model PublicationCollect {
+  id            String   @id @default(cuid())
+  publicationId String
+  userId        String
+  createdAt     DateTime @default(now())
+
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@unique([publicationId, userId])
+}
