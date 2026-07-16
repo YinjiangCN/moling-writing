@@ -30,6 +30,7 @@ import {
   Save,
   Trash2,
   ChevronRight,
+  Archive,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
@@ -117,16 +118,29 @@ function SearchTool({ novelId, onJumpChapter }: { novelId: string; onJumpChapter
 function ExportTool({ novelId, novelTitle, chapterId }: { novelId: string; novelTitle: string; chapterId: string | null }) {
   const [open, setOpen] = useState(false)
 
-  const handleExport = (scope: 'novel' | 'chapter', format: 'txt' | 'markdown') => {
+  const handleExport = (scope: 'novel' | 'chapter' | 'zip', format: 'txt' | 'markdown') => {
     const params = new URLSearchParams()
     params.set('format', format)
-    if (scope === 'novel') params.set('novelId', novelId)
-    else {
+    if (scope === 'novel') {
+      params.set('novelId', novelId)
+    } else if (scope === 'chapter') {
       if (!chapterId) {
         toast.error('请先选择章节')
         return
       }
       params.set('chapterId', chapterId)
+    } else if (scope === 'zip') {
+      params.set('novelId', novelId)
+      const url = `/api/export/zip?${params.toString()}`
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${novelTitle}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      toast.success('已开始下载 ZIP 压缩包')
+      setOpen(false)
+      return
     }
     const url = `/api/export?${params.toString()}`
     const a = document.createElement('a')
@@ -146,37 +160,71 @@ function ExportTool({ novelId, novelTitle, chapterId }: { novelId: string; novel
           <Download className="w-4 h-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-56" align="end">
-        <div className="space-y-2">
-          <div className="text-xs font-medium text-muted-foreground">全书导出</div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleExport('novel', 'txt')}>
-              <FileText className="w-3.5 h-3.5" /> TXT
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleExport('novel', 'markdown')}>
-              <FileText className="w-3.5 h-3.5" /> Markdown
-            </Button>
+      <PopoverContent className="w-64" align="end">
+        <div className="space-y-3">
+          {/* ZIP 导出（推荐） */}
+          <div className="bg-gradient-to-br from-violet-50 to-pink-50 dark:from-violet-950/30 dark:to-pink-950/20 border border-violet-200 dark:border-violet-900 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-violet-700 dark:text-violet-300">
+              <Archive className="w-3.5 h-3.5" />
+              全书 ZIP 压缩包（推荐）
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              按卷分文件夹，每章独立文件
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-1.5 bg-gradient-to-r from-violet-500 to-pink-500 hover:opacity-90"
+                onClick={() => handleExport('zip', 'txt')}
+              >
+                <Archive className="w-3.5 h-3.5" /> ZIP-TXT
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-1.5 bg-gradient-to-r from-violet-500 to-pink-500 hover:opacity-90"
+                onClick={() => handleExport('zip', 'markdown')}
+              >
+                <Archive className="w-3.5 h-3.5" /> ZIP-MD
+              </Button>
+            </div>
           </div>
-          <div className="text-xs font-medium text-muted-foreground pt-2">当前章节导出</div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={!chapterId}
-              onClick={() => handleExport('chapter', 'txt')}
-            >
-              <FileText className="w-3.5 h-3.5" /> TXT
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={!chapterId}
-              onClick={() => handleExport('chapter', 'markdown')}
-            >
-              <FileText className="w-3.5 h-3.5" /> Markdown
-            </Button>
+
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">全书单文件</div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleExport('novel', 'txt')}>
+                <FileText className="w-3.5 h-3.5" /> TXT
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleExport('novel', 'markdown')}>
+                <FileText className="w-3.5 h-3.5" /> Markdown
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">当前章节导出</div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={!chapterId}
+                onClick={() => handleExport('chapter', 'txt')}
+              >
+                <FileText className="w-3.5 h-3.5" /> TXT
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={!chapterId}
+                onClick={() => handleExport('chapter', 'markdown')}
+              >
+                <FileText className="w-3.5 h-3.5" /> Markdown
+              </Button>
+            </div>
           </div>
         </div>
       </PopoverContent>
