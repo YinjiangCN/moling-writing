@@ -240,6 +240,93 @@ model EmailCode {
   @@index([email, purpose])
 }
 
+// ============ 公告与消息系统 ============
+// 平台公告（全站广播，所有用户可见）
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   // 支持 markdown / 纯文本
+  type        String   @default("info") // info / warning / success / maintenance
+  // 状态
+  published   Boolean  @default(false) // false=草稿，true=已发布
+  pinned      Boolean  @default(false) // 是否置顶
+  // 时间
+  publishAt   DateTime? // 计划发布时间（null=立即）
+  expiresAt   DateTime? // 过期时间（null=永久）
+  // 创建信息
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reads       AnnouncementRead[]
+
+  @@index([published, publishAt])
+}
+
+// 用户已读公告记录
+model AnnouncementRead {
+  id              String   @id @default(cuid())
+  announcementId  String
+  userId          String
+  readAt          DateTime @default(now())
+
+  announcement    Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+}
+
+// 用户消息（管理员群发或单独发送）
+model Message {
+  id          String   @id @default(cuid())
+  // 接收人（userId 为空表示群发，所有用户可见）
+  userId      String?  // null = 全员消息
+  // 发送人
+  senderId    String   // 管理员 id
+  senderName  String   // 冗余存储发送人名
+  // 内容
+  title       String
+  content     String
+  type        String   @default("notice") // notice / system / warning / reward
+  // 状态
+  deleted     Boolean  @default(false) // 软删除（用户主动删除）
+  // 邮件通知
+  emailSent   Boolean  @default(false) // 是否已发送邮件通知
+  emailToSend String?  // 接收邮箱（用于群发邮件记录）
+  // 时间
+  createdAt   DateTime @default(now())
+
+  // 用户已读记录（用于群发消息追踪单个用户的已读状态）
+  reads       MessageRead[]
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+// 用户已读消息记录
+model MessageRead {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+// 用户已删除的消息记录（用于群发消息的软删除）
+model MessageDeleted {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  deletedAt DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
 // ============ 兑换码系统 ============
 // 兑换码（管理员生成）
 model RedeemCode {

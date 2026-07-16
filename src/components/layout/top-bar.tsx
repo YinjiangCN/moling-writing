@@ -1,7 +1,7 @@
 'use client'
 
 import { useAppStore } from '@/lib/store'
-import { LayoutGrid, Settings, User, Sparkles, PenLine, Shield, LogOut, Loader2 } from 'lucide-react'
+import { LayoutGrid, Settings, User, Sparkles, PenLine, Shield, LogOut, Loader2, Bell, Megaphone } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/helpers'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +33,7 @@ interface UserPublic {
 export function TopBar() {
   const { user, setUser, authLoading, view, setView, backToWorkspace } = useAppStore()
   const [tokens, setTokens] = useState<number | null>(null)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   // 启动时拉取当前用户
   useEffect(() => {
@@ -53,18 +54,25 @@ export function TopBar() {
     load()
   }, [setUser])
 
-  // 拉取最新 token
+  // 拉取最新 token + 未读消息数
   useEffect(() => {
     if (!user) return
     let mounted = true
     const load = async () => {
       try {
-        const r = await api<{ user: { tokens: number } }>('/api/user')
-        if (mounted) setTokens(r.user.tokens)
+        const [userR, msgR, annR] = await Promise.all([
+          api<{ user: { tokens: number } }>('/api/user'),
+          api<{ unreadCount: number }>('/api/messages').catch(() => ({ unreadCount: 0 })),
+          api<{ unreadCount: number }>('/api/announcements').catch(() => ({ unreadCount: 0 })),
+        ])
+        if (mounted) {
+          setTokens(userR.user.tokens)
+          setUnreadCount((msgR.unreadCount || 0) + (annR.unreadCount || 0))
+        }
       } catch {}
     }
     load()
-    const i = setInterval(load, 20000)
+    const i = setInterval(load, 30000)
     return () => {
       mounted = false
       clearInterval(i)
@@ -157,6 +165,22 @@ export function TopBar() {
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
+        {/* 消息铃铛 */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative h-8 w-8"
+          onClick={() => setView('user')}
+          title="平台消息与公告"
+        >
+          <Bell className="w-4 h-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </Button>
+
         {tokens !== null && (
           <Badge variant="secondary" className="gap-1.5 px-3 py-1 cursor-pointer" onClick={() => setView('user')}>
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />

@@ -249,6 +249,112 @@ export async function sendRedeemNotification(
   }
 }
 
+// 发送平台公告邮件
+export async function sendAnnouncementEmail(
+  email: string,
+  data: {
+    title: string
+    content: string
+    type: string
+    publishAt: Date | null
+  }
+) {
+  const result = await createTransporter()
+  if (!result) return { ok: false, error: '邮件服务未配置' }
+  const { transporter, config } = result
+
+  const typeText: Record<string, string> = {
+    info: '平台通知',
+    warning: '重要提醒',
+    success: '好消息',
+    maintenance: '维护公告',
+  }
+  const typeColor: Record<string, string> = {
+    info: '#3b82f6',
+    warning: '#f59e0b',
+    success: '#10b981',
+    maintenance: '#8b5cf6',
+  }
+
+  try {
+    await transporter.sendMail({
+      from: `"${config.fromName}" <${config.smtpUser}>`,
+      to: email,
+      subject: `【墨灵写作】${typeText[data.type] || '公告'}：${data.title}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+          <div style="background: linear-gradient(135deg, ${typeColor[data.type] || '#8b5cf6'}, #ec4899); padding: 24px; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 22px;">墨灵写作</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 4px 0 0; font-size: 13px;">${typeText[data.type] || '平台公告'}</p>
+          </div>
+          <div style="background: #fafafa; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+            <h2 style="color: #1f2937; margin: 0 0 16px; font-size: 18px;">${data.title}</h2>
+            <div style="color: #4b5563; line-height: 1.7; margin: 0 0 16px; white-space: pre-wrap;">${data.content}</div>
+            <p style="color: #9ca3af; font-size: 12px; margin: 16px 0 0; border-top: 1px solid #e5e7eb; padding-top: 12px;">
+              发布时间：${(data.publishAt ? new Date(data.publishAt) : new Date()).toLocaleString('zh-CN')}<br/>
+              请登录墨灵写作查看完整内容。
+            </p>
+          </div>
+        </div>
+      `,
+    })
+    return { ok: true }
+  } catch (e: any) {
+    console.error('Send announcement email failed:', e.message)
+    return { ok: false, error: e.message }
+  }
+}
+
+// 发送个人消息邮件
+export async function sendMessageEmail(
+  email: string,
+  data: {
+    title: string
+    content: string
+    type: string
+    senderName: string
+  }
+) {
+  const result = await createTransporter()
+  if (!result) return { ok: false, error: '邮件服务未配置' }
+  const { transporter, config } = result
+
+  const typeText: Record<string, string> = {
+    notice: '通知',
+    system: '系统消息',
+    warning: '警告',
+    reward: '奖励',
+  }
+
+  try {
+    await transporter.sendMail({
+      from: `"${config.fromName}" <${config.smtpUser}>`,
+      to: email,
+      subject: `【墨灵写作】${typeText[data.type] || '消息'}：${data.title}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+          <div style="background: linear-gradient(135deg, #8b5cf6, #ec4899); padding: 24px; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 22px;">墨灵写作</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 4px 0 0; font-size: 13px;">来自 ${data.senderName} 的消息</p>
+          </div>
+          <div style="background: #fafafa; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+            <h2 style="color: #1f2937; margin: 0 0 16px; font-size: 18px;">${data.title}</h2>
+            <div style="color: #4b5563; line-height: 1.7; margin: 0 0 16px; white-space: pre-wrap;">${data.content}</div>
+            <p style="color: #9ca3af; font-size: 12px; margin: 16px 0 0; border-top: 1px solid #e5e7eb; padding-top: 12px;">
+              发送时间：${new Date().toLocaleString('zh-CN')}<br/>
+              请登录墨灵写作查看并回复。
+            </p>
+          </div>
+        </div>
+      `,
+    })
+    return { ok: true }
+  } catch (e: any) {
+    console.error('Send message email failed:', e.message)
+    return { ok: false, error: e.message }
+  }
+}
+
 // 常见 SMTP 配置预设
 export const SMTP_PRESETS: Record<string, { host: string; port: number; secure: boolean; help: string }> = {
   '163': { host: 'smtp.163.com', port: 465, secure: true, help: '网易163邮箱，需使用授权码（非登录密码）' },

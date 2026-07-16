@@ -40,6 +40,7 @@ import {
   Gift,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { MessagesPanel } from './messages-panel'
 
 interface UserData {
   user: {
@@ -437,6 +438,9 @@ export function UserCenter() {
             </CardContent>
           </Card>
         </div>
+
+        {/* 消息中心 */}
+        <MessagesPanel />
 
         {/* 兑换码 */}
         <RedeemCard onRedeemed={load} />
