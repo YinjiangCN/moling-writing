@@ -46,6 +46,8 @@ import {
   Ticket,
   Copy,
   Plus,
+  Download,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -1181,6 +1183,8 @@ function RedeemCodesTab() {
   const [statusFilter, setStatusFilter] = useState('')
   const [batchFilter, setBatchFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [exporting, setExporting] = useState(false)
 
   // 生成表单
   const [genOpen, setGenOpen] = useState(false)
@@ -1194,6 +1198,14 @@ function RedeemCodesTab() {
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState<any>(null)
 
+  // 通用码选项
+  const [genIsGeneric, setGenIsGeneric] = useState(false)
+  const [genMaxUses, setGenMaxUses] = useState(0)
+
+  // 自定义兑换码
+  const [genIsCustom, setGenIsCustom] = useState(false)
+  const [genCustomCode, setGenCustomCode] = useState('')
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -1201,6 +1213,7 @@ function RedeemCodesTab() {
       if (statusFilter) params.status = statusFilter
       if (batchFilter) params.batchId = batchFilter
       if (search) params.search = search
+      if (typeFilter) params.isGeneric = typeFilter === 'generic' ? 'true' : 'false'
       const r = await api('/api/admin/redeem-codes', { params })
       setData(r)
     } catch (e: any) {
@@ -1208,23 +1221,63 @@ function RedeemCodesTab() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, batchFilter, search])
+  }, [page, statusFilter, batchFilter, search, typeFilter])
 
   useEffect(() => {
     load()
   }, [load])
 
   const handleGenerate = async () => {
-    if (genCount < 1 || genCount > 1000) {
-      toast.error('数量必须在 1-1000 之间')
-      return
-    }
     if (genRewardType === 'token' && genTokenAmount <= 0) {
       toast.error('Token 数量必须大于 0')
       return
     }
     if (genRewardType === 'plan' && genPlanDays <= 0) {
       toast.error('会员天数必须大于 0')
+      return
+    }
+
+    // 自定义码模式
+    if (genIsCustom) {
+      if (!genCustomCode.trim()) {
+        toast.error('请输入自定义兑换码')
+        return
+      }
+      setGenerating(true)
+      try {
+        const body: any = {
+          rewardType: genRewardType,
+          batchNote: genBatchNote,
+          expiresAt: genExpiresAt || null,
+          isGeneric: true,
+          maxUses: Number(genMaxUses) || 0,
+          isCustom: true,
+          customCode: genCustomCode,
+        }
+        if (genRewardType === 'token') body.tokenAmount = Number(genTokenAmount)
+        else {
+          body.planReward = genPlanReward
+          body.planDays = Number(genPlanDays)
+        }
+        const r = await api('/api/admin/redeem-codes', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        })
+        setGenResult(r)
+        toast.success(r.message)
+        setGenCustomCode('')
+        load()
+      } catch (e: any) {
+        toast.error(e.message)
+      } finally {
+        setGenerating(false)
+      }
+      return
+    }
+
+    // 批量生成模式
+    if (genCount < 1 || genCount > 1000) {
+      toast.error('数量必须在 1-1000 之间')
       return
     }
     setGenerating(true)
@@ -1234,6 +1287,8 @@ function RedeemCodesTab() {
         rewardType: genRewardType,
         batchNote: genBatchNote,
         expiresAt: genExpiresAt || null,
+        isGeneric: genIsGeneric,
+        maxUses: genIsGeneric ? Number(genMaxUses) || 0 : 0,
       }
       if (genRewardType === 'token') body.tokenAmount = Number(genTokenAmount)
       else {
@@ -1251,6 +1306,44 @@ function RedeemCodesTab() {
       toast.error(e.message)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      params.set('export', 'csv')
+      if (statusFilter) params.set('status', statusFilter)
+      if (batchFilter) params.set('batchId', batchFilter)
+      if (search) params.set('search', search)
+      if (typeFilter === 'generic') params.set('isGeneric', 'true')
+      if (typeFilter === 'exclusive') params.set('isGeneric', 'false')
+      
+      // 直接浏览器下载（带 cookie）
+      const url = `/api/admin/redeem-codes?${params.toString()}`
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `redeem-codes-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      toast.success('CSV 文件已下载')
+    } catch (e: any) {
+      toast.error('导出失败：' + e.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleDeleteOne = async (id: string) => {
+    if (!confirm('确认删除此兑换码？此操作不可恢复。')) return
+    try {
+      const r = await api(`/api/admin/redeem-codes?id=${id}`, { method: 'DELETE' })
+      toast.success(r.message)
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
     }
   }
 
@@ -1332,9 +1425,13 @@ function RedeemCodesTab() {
 
       {/* 操作栏 */}
       <div className="flex flex-wrap gap-2 items-center">
-        <Button onClick={() => setGenOpen(true)} className="gap-1.5">
+        <Button onClick={() => { setGenOpen(true); setGenResult(null) }} className="gap-1.5">
           <Plus className="w-4 h-4" />
-          批量生成兑换码
+          创建兑换码
+        </Button>
+        <Button onClick={handleExport} disabled={exporting} variant="outline" className="gap-1.5">
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          导出 CSV
         </Button>
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -1348,6 +1445,22 @@ function RedeemCodesTab() {
             className="pl-9"
           />
         </div>
+        <Select
+          value={typeFilter || 'all'}
+          onValueChange={(v) => {
+            setTypeFilter(v === 'all' ? '' : v)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="类型" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部类型</SelectItem>
+            <SelectItem value="generic">通用码</SelectItem>
+            <SelectItem value="exclusive">独占码</SelectItem>
+          </SelectContent>
+        </Select>
         <Select
           value={statusFilter || 'all'}
           onValueChange={(v) => {
@@ -1420,7 +1533,9 @@ function RedeemCodesTab() {
                 <tr>
                   <th className="text-left p-3">兑换码</th>
                   <th className="text-left p-3">奖励</th>
+                  <th className="text-left p-3">类型</th>
                   <th className="text-left p-3">状态</th>
+                  <th className="text-left p-3">使用次数</th>
                   <th className="text-left p-3">批次</th>
                   <th className="text-left p-3">使用时间</th>
                   <th className="text-left p-3">操作</th>
@@ -1432,6 +1547,11 @@ function RedeemCodesTab() {
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-medium tracking-wider">{c.code}</span>
+                        {c.isCustom && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 text-pink-600">
+                            自定义
+                          </Badge>
+                        )}
                         <button
                           onClick={() => copyToClipboard(c.code)}
                           className="opacity-50 hover:opacity-100"
@@ -1447,13 +1567,24 @@ function RedeemCodesTab() {
                       </Badge>
                     </td>
                     <td className="p-3">
+                      {c.isGeneric ? (
+                        <Badge variant="outline" className="text-blue-600 border-blue-300 text-xs">
+                          通用码
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-slate-600 text-xs">
+                          独占码
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="p-3">
                       {c.status === 'unused' ? (
                         <Badge variant="outline" className="text-emerald-600 border-emerald-300 text-xs">
                           未使用
                         </Badge>
                       ) : c.status === 'used' ? (
                         <Badge variant="outline" className="text-blue-600 border-blue-300 text-xs">
-                          已使用
+                          {c.isGeneric ? '已用完' : '已使用'}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-red-600 border-red-300 text-xs">
@@ -1461,39 +1592,61 @@ function RedeemCodesTab() {
                         </Badge>
                       )}
                     </td>
+                    <td className="p-3 text-xs">
+                      {c.isGeneric ? (
+                        <span>
+                          {c.totalUsed}
+                          {c.maxUses > 0 && <span className="text-muted-foreground"> / {c.maxUses}</span>}
+                          <span className="text-muted-foreground ml-1">次</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
                     <td className="p-3 text-xs text-muted-foreground">
-                      {c.batchNote || c.batchId?.slice(-8) || '-'}
+                      {c.batchNote || c.batchId?.slice(-8) || (c.isCustom ? '-' : '-')}
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">
                       {c.usedAt ? formatTime(c.usedAt) : '-'}
                     </td>
                     <td className="p-3">
-                      {c.status === 'unused' && (
+                      <div className="flex gap-1">
+                        {c.status === 'unused' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-red-600"
+                            onClick={() => handleAction(c.id, 'disable')}
+                          >
+                            禁用
+                          </Button>
+                        )}
+                        {c.status === 'disabled' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-emerald-600"
+                            onClick={() => handleAction(c.id, 'enable')}
+                          >
+                            启用
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs text-red-600"
-                          onClick={() => handleAction(c.id, 'disable')}
+                          onClick={() => handleDeleteOne(c.id)}
+                          title="删除"
                         >
-                          禁用
+                          <Trash2 className="w-3 h-3" />
                         </Button>
-                      )}
-                      {c.status === 'disabled' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs text-emerald-600"
-                          onClick={() => handleAction(c.id, 'enable')}
-                        >
-                          启用
-                        </Button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {data?.codes?.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
                       暂无兑换码
                     </td>
                   </tr>
@@ -1526,14 +1679,15 @@ function RedeemCodesTab() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Ticket className="w-4 h-4" />
-              批量生成兑换码
+              {genIsCustom ? '创建自定义通用兑换码' : '批量生成兑换码'}
             </DialogTitle>
           </DialogHeader>
 
           {genResult ? (
             <div className="space-y-3 py-2">
               <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                ✓ {genResult.message}（批次 ID：{genResult.batchId.slice(-12)}）
+                ✓ {genResult.message}
+                {genResult.batchId && <>（批次 ID：{genResult.batchId.slice(-12)}）</>}
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -1567,6 +1721,47 @@ function RedeemCodesTab() {
           ) : (
             <>
               <div className="space-y-4 py-2">
+                {/* 模式切换：批量生成 / 自定义通用码 */}
+                <div className="space-y-2">
+                  <Label>创建模式</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={!genIsCustom ? 'default' : 'outline'}
+                      onClick={() => setGenIsCustom(false)}
+                      className="gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      批量生成
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={genIsCustom ? 'default' : 'outline'}
+                      onClick={() => setGenIsCustom(true)}
+                      className="gap-1.5"
+                    >
+                      <Ticket className="w-3.5 h-3.5" />
+                      自定义通用码
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 自定义码输入 */}
+                {genIsCustom && (
+                  <div className="space-y-2">
+                    <Label>自定义兑换码 *</Label>
+                    <Input
+                      value={genCustomCode}
+                      onChange={(e) => setGenCustomCode(e.target.value.toUpperCase())}
+                      placeholder="如 WELCOME2024 / VIP100"
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      仅字母数字，4-32 位。将作为通用码（一人一次，多人可用）。
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>奖励类型</Label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1650,17 +1845,62 @@ function RedeemCodesTab() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>生成数量（1-1000）</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={1000}
-                      value={genCount}
-                      onChange={(e) => setGenCount(Number(e.target.value))}
+                {/* 通用码选项（批量模式也可选） */}
+                <div className="space-y-3 border-t pt-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isGeneric"
+                      checked={genIsGeneric || genIsCustom}
+                      disabled={genIsCustom}
+                      onChange={(e) => setGenIsGeneric(e.target.checked)}
+                      className="rounded"
                     />
+                    <Label htmlFor="isGeneric" className="cursor-pointer">
+                      设为通用兑换码（一个码多人可兑换，每人限一次）
+                    </Label>
                   </div>
+                  {(genIsGeneric || genIsCustom) && (
+                    <div className="space-y-2 pl-6">
+                      <Label>最大使用次数（0 = 不限）</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={genMaxUses}
+                        onChange={(e) => setGenMaxUses(Number(e.target.value))}
+                        placeholder="如 100，0 表示不限"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        通用码可以被多个用户兑换，但同一用户仅可兑换一次。设为 0 表示不限次数。
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {!genIsCustom && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>生成数量（1-1000）</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        value={genCount}
+                        onChange={(e) => setGenCount(Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>过期时间（可选）</Label>
+                      <Input
+                        type="datetime-local"
+                        value={genExpiresAt}
+                        onChange={(e) => setGenExpiresAt(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {genIsCustom && (
                   <div className="space-y-2">
                     <Label>过期时间（可选）</Label>
                     <Input
@@ -1669,7 +1909,7 @@ function RedeemCodesTab() {
                       onChange={(e) => setGenExpiresAt(e.target.value)}
                     />
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>批次备注（可选）</Label>
@@ -1681,12 +1921,19 @@ function RedeemCodesTab() {
                 </div>
 
                 <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded p-3 text-xs text-blue-800 dark:text-blue-200">
-                  预览：将生成 <b>{genCount}</b> 个兑换码，每个奖励为
+                  预览：将创建
+                  <b>
+                    {genIsCustom
+                      ? ` 1 个自定义通用兑换码「${genCustomCode || '...'}」`
+                      : ` ${genCount} 个${genIsGeneric ? '通用' : '独占'}兑换码`}
+                  </b>
+                  ，每个奖励为
                   <b>
                     {genRewardType === 'token'
                       ? ` ${genTokenAmount.toLocaleString()} Token`
                       : ` ${genPlanReward === 'year' ? '年卡' : '月卡'}会员 ${genPlanDays} 天`}
                   </b>
+                  {(genIsGeneric || genIsCustom) && genMaxUses > 0 && `，最大使用 ${genMaxUses} 次`}
                   {genExpiresAt && `，过期时间 ${new Date(genExpiresAt).toLocaleString('zh-CN')}`}
                 </div>
               </div>
@@ -1696,7 +1943,7 @@ function RedeemCodesTab() {
                 </Button>
                 <Button onClick={handleGenerate} disabled={generating} className="gap-1.5">
                   {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  生成 {genCount} 个
+                  {genIsCustom ? '创建' : `生成 ${genCount} 个`}
                 </Button>
               </DialogFooter>
             </>

@@ -1,28 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminOr401 } from '@/lib/auth'
-import { generateUniqueCodes, describeReward } from '@/lib/redeem'
+import { generateUniqueCodes, describeReward, codesToCsv, normalizeCode, isValidCustomCode } from '@/lib/redeem'
 
 // GET /api/admin/redeem-codes - 查询兑换码列表
+// GET /api/admin/redeem-codes?export=csv - 导出 CSV
 export async function GET(req: NextRequest) {
   const session = await requireAdminOr401()
   if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
 
   const url = new URL(req.url)
+  const isExport = url.searchParams.get('export') === 'csv'
+
   const page = parseInt(url.searchParams.get('page') || '1')
   const pageSize = parseInt(url.searchParams.get('pageSize') || '20')
   const status = url.searchParams.get('status') || ''
   const batchId = url.searchParams.get('batchId') || ''
   const search = url.searchParams.get('search') || ''
+  const isGeneric = url.searchParams.get('isGeneric') || ''
 
   const where: any = {}
   if (status) where.status = status
   if (batchId) where.batchId = batchId
+  if (isGeneric === 'true') where.isGeneric = true
+  if (isGeneric === 'false') where.isGeneric = false
   if (search) {
     where.OR = [
       { code: { contains: search.toUpperCase() } },
       { batchNote: { contains: search } },
     ]
+  }
+
+  // CSV 导出：导出最多 10000 条
+  if (isExport) {
+    const codes = await db.redeemCode.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 10000,
+    })
+
+    const rows = codes.map((c) => ({
+      code: c.code,
+      rewardType: c.rewardType,
+      rewardDesc: describeReward(c),
+      tokenAmount: c.tokenAmount,
+      planReward: c.planReward,
+      planDays: c.planDays,
+      isGeneric: c.isGeneric,
+      isCustom: c.isCustom,
+      maxUses: c.maxUses,
+      totalUsed: c.totalUsed,
+      status: c.status,
+      batchId: c.batchId,
+      batchNote: c.batchNote,
+      usedBy: c.usedBy,
+      usedAt: c.usedAt,
+      expiresAt: c.expiresAt,
+      createdAt: c.createdAt,
+    }))
+
+    const csv = codesToCsv(rows)
+    const filename = `redeem-codes-${new Date().toISOString().slice(0, 10)}.csv`
+    return new NextResponse(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    })
   }
 
   const [codes, total] = await Promise.all([
@@ -37,6 +81,7 @@ export async function GET(req: NextRequest) {
             redeemCode: { select: { code: true } },
           },
         },
+        uses: true,
       },
     }),
     db.redeemCode.count({ where }),
@@ -58,16 +103,15 @@ export async function GET(req: NextRequest) {
     unused: await db.redeemCode.count({ where: { status: 'unused' } }),
     used: await db.redeemCode.count({ where: { status: 'used' } }),
     disabled: await db.redeemCode.count({ where: { status: 'disabled' } }),
+    generic: await db.redeemCode.count({ where: { isGeneric: true } }),
+    custom: await db.redeemCode.count({ where: { isCustom: true } }),
   }
 
   return NextResponse.json({
     codes: codes.map((c) => ({
       ...c,
       rewardDesc: describeReward(c),
-      // 如果已使用，附上使用者信息
-      user: c.history[0]
-        ? null // 实际需要查询 user，这里简化
-        : null,
+      useCount: c.isGeneric ? c.uses.length : (c.status === 'used' ? 1 : 0),
     })),
     total,
     page,
@@ -78,7 +122,7 @@ export async function GET(req: NextRequest) {
   })
 }
 
-// POST - 批量生成兑换码
+// POST - 批量生成兑换码 或 创建自定义通用兑换码
 export async function POST(req: NextRequest) {
   const session = await requireAdminOr401()
   if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
@@ -91,7 +135,13 @@ export async function POST(req: NextRequest) {
     planReward = null,
     planDays = 0,
     batchNote = '',
-    expiresAt = null, // ISO 字符串或 null
+    expiresAt = null,
+    // 通用码相关
+    isGeneric = false,
+    maxUses = 0,
+    // 自定义兑换码相关
+    isCustom = false,
+    customCode = '',
   } = body
 
   if (!['token', 'plan'].includes(rewardType)) {
@@ -108,6 +158,57 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '会员天数必须大于 0' }, { status: 400 })
     }
   }
+
+  // 自定义通用兑换码（管理员手动指定 code）
+  if (isCustom) {
+    if (!customCode?.trim()) {
+      return NextResponse.json({ error: '请输入自定义兑换码' }, { status: 400 })
+    }
+    if (!isValidCustomCode(customCode)) {
+      return NextResponse.json({ error: '兑换码格式不正确（仅字母数字，4-32 位）' }, { status: 400 })
+    }
+    const normalized = normalizeCode(customCode)
+    const formattedCode = normalized.match(/.{1,4}/g)?.join('-') || normalized
+
+    // 检查是否已存在
+    const existing = await db.redeemCode.findFirst({
+      where: {
+        OR: [{ code: formattedCode }, { code: normalized }],
+      },
+    })
+    if (existing) {
+      return NextResponse.json({ error: '该兑换码已存在' }, { status: 400 })
+    }
+
+    const created = await db.redeemCode.create({
+      data: {
+        code: formattedCode,
+        rewardType,
+        tokenAmount: rewardType === 'token' ? tokenAmount : 0,
+        planReward: rewardType === 'plan' ? planReward : null,
+        planDays: rewardType === 'plan' ? planDays : 0,
+        batchId: null,
+        batchNote: batchNote || null,
+        status: 'unused',
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        isGeneric: true, // 自定义码默认为通用码
+        maxUses: maxUses || 0,
+        totalUsed: 0,
+        isCustom: true,
+        createdById: session.user.id,
+      },
+    })
+
+    return NextResponse.json({
+      ok: true,
+      count: 1,
+      codes: [formattedCode],
+      code: created,
+      message: `自定义通用兑换码「${formattedCode}」已创建`,
+    })
+  }
+
+  // 批量生成（支持通用码）
   if (count < 1 || count > 1000) {
     return NextResponse.json({ error: '生成数量必须在 1-1000 之间' }, { status: 400 })
   }
@@ -116,7 +217,6 @@ export async function POST(req: NextRequest) {
 
   const batchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
-  // 批量创建
   const created = await db.redeemCode.createMany({
     data: codes.map((code) => ({
       code,
@@ -128,6 +228,10 @@ export async function POST(req: NextRequest) {
       batchNote: batchNote || null,
       status: 'unused',
       expiresAt: expiresAt ? new Date(expiresAt) : null,
+      isGeneric: !!isGeneric,
+      maxUses: isGeneric ? (maxUses || 0) : 0,
+      totalUsed: 0,
+      isCustom: false,
       createdById: session.user.id,
     })),
   })
@@ -136,8 +240,9 @@ export async function POST(req: NextRequest) {
     ok: true,
     batchId,
     count: created.count,
-    codes, // 返回生成的兑换码列表（仅本次返回，刷新页面后只能从列表查看）
-    message: `成功生成 ${created.count} 个兑换码`,
+    codes,
+    isGeneric: !!isGeneric,
+    message: `成功生成 ${created.count} 个${isGeneric ? '通用' : '独占'}兑换码`,
   })
 }
 
@@ -159,10 +264,12 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (action === 'enable') {
-    // 只能重新启用未使用的
     const code = await db.redeemCode.findUnique({ where: { id } })
     if (!code) return NextResponse.json({ error: '未找到' }, { status: 404 })
-    if (code.status === 'used') return NextResponse.json({ error: '已使用的兑换码不能启用' }, { status: 400 })
+    // 独占码已使用不可启用；通用码已禁用可启用（不影响已兑换记录）
+    if (!code.isGeneric && code.status === 'used') {
+      return NextResponse.json({ error: '已使用的独占兑换码不能启用' }, { status: 400 })
+    }
     const updated = await db.redeemCode.update({
       where: { id },
       data: { status: 'unused' },
@@ -180,7 +287,23 @@ export async function DELETE(req: NextRequest) {
 
   const url = new URL(req.url)
   const batchId = url.searchParams.get('batchId')
-  if (!batchId) return NextResponse.json({ error: '需要 batchId' }, { status: 400 })
+  const id = url.searchParams.get('id')
+
+  // 删除单个兑换码（仅自定义码或未使用的批次码）
+  if (id) {
+    const code = await db.redeemCode.findUnique({ where: { id } })
+    if (!code) return NextResponse.json({ error: '未找到' }, { status: 404 })
+    if (!code.isGeneric && code.status === 'used') {
+      return NextResponse.json({ error: '已使用的独占兑换码不能删除' }, { status: 400 })
+    }
+    if (code.isGeneric && code.totalUsed > 0) {
+      return NextResponse.json({ error: '已有用户使用的通用码不能删除（可改为禁用）' }, { status: 400 })
+    }
+    await db.redeemCode.delete({ where: { id } })
+    return NextResponse.json({ ok: true, message: '已删除' })
+  }
+
+  if (!batchId) return NextResponse.json({ error: '需要 batchId 或 id' }, { status: 400 })
 
   // 只能删除未使用的
   const result = await db.redeemCode.deleteMany({

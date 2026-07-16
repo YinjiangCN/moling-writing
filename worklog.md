@@ -230,3 +230,79 @@ Stage Summary:
   * 支持过期时间（可选）
   * 支持禁用/启用
   * 完整的使用历史记录（前后余额快照）
+
+---
+Task ID: extend-4
+Agent: 主 Agent (fullstack-dev)
+Task: 实现兑换码 CSV 导出 + 自定义通用兑换码（一人一次，多人可用）+ 兑换成功邮件通知
+
+Work Log:
+- 扩展 Prisma schema：
+  * RedeemCode 加 isGeneric（通用码标识）、maxUses（最大使用次数，0=不限）、totalUsed（已使用次数）、isCustom（自定义码标识）
+  * 新增 RedeemUse 模型：通用码的用户使用记录（codeId+userId 唯一约束，保证一人一次）
+- 扩展 src/lib/redeem.ts：
+  * normalizeCode - 标准化用户输入（去空格、去连字符、转大写）
+  * isValidCustomCode - 校验自定义兑换码格式（字母数字 4-32 位）
+  * codesToCsv + escapeCsvField - CSV 导出（含 BOM 头让 Excel 正确识别 UTF-8，17 列完整字段）
+  * RedeemCodeExportRow 接口
+- 扩展 src/lib/email.ts：
+  * sendRedeemNotification - 兑换成功通知邮件（HTML 模板，渐变标题 + 兑换码 + 奖励 + 账户变化前后对比）
+- 扩展 /api/admin/redeem-codes：
+  * GET 支持 ?export=csv 直接返回 CSV 文件（Content-Type: text/csv，最多 10000 条）
+  * GET 新增 isGeneric 筛选参数
+  * POST 支持 isGeneric/maxUses/isCustom/customCode 参数
+    - 自定义码模式：管理员手动指定 code（如 WELCOME2026），自动设为通用码
+    - 批量生成模式：支持勾选「设为通用兑换码」+ 最大使用次数
+  * PATCH 调整启用逻辑：通用码已禁用可启用，独占码已使用不可启用
+  * DELETE 支持单个删除（id 参数）：独占码已使用不可删，通用码已被使用不可删（提示禁用）
+  * 统计新增 generic 和 custom 计数
+- 扩展 /api/redeem：
+  * 通用码兑换逻辑：
+    - 检查 RedeemUse 是否已存在（codeId+userId 唯一约束）
+    - 检查 maxUses 限制
+    - 创建 RedeemUse 记录（防重复兑换）
+    - 更新 totalUsed，达到 maxUses 时标记为 used
+    - 记录 RedeemHistory
+  * 独占码逻辑保持不变
+  * 两种模式都异步发送邮件通知（不阻塞响应）
+- 管理员后台 RedeemCodesTab 大幅增强：
+  * 统计卡片新增「通用码」「自定义码」计数（实际 UI 显示 4 个核心卡片）
+  * 操作栏：创建兑换码 + 导出 CSV 按钮 + 类型筛选下拉 + 状态筛选 + 搜索
+  * 表格新增列：类型（通用码/独占码）、使用次数（通用码显示 X / Y 次，独占码显示 -）
+  * 表格新增操作：单个删除按钮（Trash2 图标）
+  * 通用码状态显示「已用完」而非「已使用」
+  * 自定义码显示粉色「自定义」标签
+  * 生成对话框重构：
+    - 创建模式切换：批量生成 / 自定义通用码
+    - 自定义码输入框（自动转大写）
+    - 通用码 checkbox + 最大使用次数输入
+    - 模式感知的表单字段（自定义码不显示数量）
+    - 预览文案根据模式动态变化
+- ESLint 通过
+- Agent Browser 端到端验证：
+  * 管理员登录后看到「兑换码」Tab（共 7 个 Tab）
+  * 兑换码 Tab 显示「创建兑换码」+「导出 CSV」按钮 + 类型筛选下拉
+  * 点击「创建兑换码」打开对话框，有「批量生成」和「自定义通用码」两种模式
+  * 切换到「自定义通用码」模式，输入 WELCOME2026，自动勾选通用码
+  * 点击创建，成功：「自定义通用兑换码「WELC-OME2-026」已创建」
+  * 管理员在用户中心兑换 WELCOME2026：成功，Token +50000
+  * 管理员再次兑换：拒绝「你已兑换过此兑换码，每个用户仅可兑换一次」
+  * 新用户 newuser@test.com 兑换同一码：成功，Token 5000 → 55000
+    → 验证「一个通用码多人可兑换，每人限一次」
+  * CSV 导出 API 测试：返回完整 CSV，含 BOM 头，17 列，16 条记录
+    WELC-OME2-026 显示「是通用码、是自定义、已使用 2 次」
+  * UI 中点击「导出 CSV」按钮：显示「CSV 文件已下载」提示
+  * 管理员后台列表正确显示：WELC-OME2-026 [自定义] 通用码 未使用 2次
+
+Stage Summary:
+- 三大功能完整实现并端到端验证
+- 数据库：RedeemCode 加 4 个字段，新增 RedeemUse 表
+- 工具库：redeem.ts 加 CSV 导出 + 自定义码校验，email.ts 加兑换通知模板
+- API：管理员支持 CSV 导出 + 通用码生成 + 单个删除；用户兑换支持通用码逻辑 + 邮件通知
+- 前端：管理员后台兑换码 Tab 大幅增强（模式切换、通用码选项、CSV 导出、类型筛选、单个删除）
+- 兑换码现在支持两种类型：
+  * 独占码：一码一人（原有功能）
+  * 通用码：一码多人，每人限一次（新增）
+- 自定义码：管理员可手动指定 code（如 WELCOME2026），自动设为通用码
+- CSV 导出：支持当前筛选条件导出，UTF-8 BOM 头兼容 Excel
+- 邮件通知：兑换成功后异步发送 HTML 邮件，含兑换码、奖励、账户变化前后对比

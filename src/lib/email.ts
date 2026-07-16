@@ -159,6 +159,96 @@ export async function verifyCode(email: string, code: string, purpose: string = 
   return { ok: true }
 }
 
+// 发送兑换成功通知邮件
+export async function sendRedeemNotification(
+  email: string,
+  data: {
+    code: string
+    rewardDesc: string
+    rewardType: string
+    tokenAmount: number
+    planReward: string | null
+    planDays: number
+    tokensBefore: number
+    tokensAfter: number
+    planBefore: string
+    planAfter: string
+  }
+) {
+  const result = await createTransporter()
+  if (!result) {
+    return { ok: false, error: '邮件服务未配置' }
+  }
+  const { transporter, config } = result
+
+  const planText = (plan: string) =>
+    plan === 'year' ? '年卡会员' : plan === 'pro' ? '月卡会员' : '免费用户'
+
+  try {
+    await transporter.sendMail({
+      from: `"${config.fromName}" <${config.smtpUser}>`,
+      to: email,
+      subject: `【墨灵写作】兑换成功 - ${data.rewardDesc}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+          <div style="background: linear-gradient(135deg, #8b5cf6, #ec4899); padding: 24px; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 22px;">墨灵写作</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 4px 0 0; font-size: 13px;">兑换成功通知</p>
+          </div>
+          <div style="background: #fafafa; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+            <h2 style="color: #1f2937; margin: 0 0 16px; font-size: 18px;">
+              🎉 兑换成功！
+            </h2>
+            <p style="color: #4b5563; line-height: 1.6; margin: 0 0 16px;">
+              你的兑换码已成功兑换，奖励已到账：
+            </p>
+
+            <div style="background: white; border: 2px dashed #8b5cf6; border-radius: 8px; padding: 16px; margin: 16px 0;">
+              <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">兑换码</div>
+              <div style="font-family: monospace; font-size: 16px; color: #1f2937; letter-spacing: 1px;">
+                ${data.code}
+              </div>
+              <div style="margin-top: 12px; font-size: 12px; color: #6b7280;">获得奖励</div>
+              <div style="font-size: 18px; font-weight: bold; color: #8b5cf6;">
+                ${data.rewardDesc}
+              </div>
+            </div>
+
+            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin: 16px 0;">
+              <p style="margin: 0 0 8px; font-size: 12px; color: #6b7280;">账户变化</p>
+              <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;">
+                <span style="color: #6b7280;">Token 余额</span>
+                <span style="font-family: monospace;">
+                  <span style="color: #9ca3af;">${data.tokensBefore.toLocaleString()}</span>
+                  <span style="color: #8b5cf6; margin: 0 8px;">→</span>
+                  <span style="color: #1f2937; font-weight: bold;">${data.tokensAfter.toLocaleString()}</span>
+                </span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;">
+                <span style="color: #6b7280;">会员等级</span>
+                <span>
+                  <span style="color: #9ca3af;">${planText(data.planBefore)}</span>
+                  <span style="color: #8b5cf6; margin: 0 8px;">→</span>
+                  <span style="color: #1f2937; font-weight: bold;">${planText(data.planAfter)}</span>
+                </span>
+              </div>
+            </div>
+
+            <p style="color: #9ca3af; font-size: 12px; margin: 16px 0 0;">
+              兑换时间：${new Date().toLocaleString('zh-CN')}<br/>
+              如有疑问请联系平台管理员。
+            </p>
+          </div>
+        </div>
+      `,
+    })
+    return { ok: true }
+  } catch (e: any) {
+    console.error('Send redeem notification failed:', e.message)
+    return { ok: false, error: e.message }
+  }
+}
+
 // 常见 SMTP 配置预设
 export const SMTP_PRESETS: Record<string, { host: string; port: number; secure: boolean; help: string }> = {
   '163': { host: 'smtp.163.com', port: 465, secure: true, help: '网易163邮箱，需使用授权码（非登录密码）' },

@@ -257,17 +257,39 @@ model RedeemCode {
   batchNote   String?   // 批次备注（如「双十一活动」）
   // 状态
   status      String    @default("unused") // unused / used / disabled
-  usedBy      String?   // 使用者 userId
+  usedBy      String?   // 使用者 userId（仅独占码有效）
   usedAt      DateTime?
   expiresAt   DateTime? // 兑换码过期时间（null 表示永久）
+  // 通用兑换码（一个码可被多人使用，每人限一次）
+  isGeneric   Boolean   @default(false) // true=通用码，false=独占码
+  maxUses     Int       @default(0) // 通用码最大使用次数（0=不限）
+  totalUsed   Int       @default(0) // 通用码已被使用的次数
+  // 自定义标识（管理员手动创建的通用兑换码）
+  isCustom    Boolean   @default(false) // true=管理员手动创建的自定义码
   // 创建信息
   createdById String    // 创建管理员 id
   createdAt   DateTime  @default(now())
 
   history     RedeemHistory[]
+  uses        RedeemUse[]
 
   @@index([batchId])
   @@index([status])
+  @@index([isGeneric])
+}
+
+// 通用兑换码的用户使用记录（一个通用码可被多人使用，每人限一次）
+model RedeemUse {
+  id        String   @id @default(cuid())
+  codeId    String
+  code      String   // 冗余存储兑换码字符串
+  userId    String
+  redeemedAt DateTime @default(now())
+
+  redeemCode RedeemCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+
+  @@unique([codeId, userId]) // 同一通用码同一用户只能用一次
+  @@index([userId])
 }
 
 // 兑换历史记录
