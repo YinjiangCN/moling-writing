@@ -205,3 +205,37 @@ model ChatMessage {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
 }
+
+// ============ 邮件系统 ============
+// 管理员配置的 SMTP 邮箱（单条记录，全局唯一）
+model EmailConfig {
+  id           String   @id @default(cuid())
+  // SMTP 配置
+  smtpHost     String   // 如 smtp.163.com
+  smtpPort     Int      @default(465)
+  smtpSecure   Boolean  @default(true) // 465 为 true，587 为 false
+  smtpUser     String   // 邮箱地址
+  smtpPass     String   // 邮箱密码或授权码
+  fromName     String   @default("墨灵写作") // 发件人显示名
+  // 状态
+  enabled      Boolean  @default(true)
+  lastTestAt   DateTime?
+  lastTestOk   Boolean  @default(false)
+  lastTestErr  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// 邮箱验证码（用于注册、找回密码等场景）
+model EmailCode {
+  id        String   @id @default(cuid())
+  email     String   // 接收邮箱
+  code      String   // 6 位验证码
+  purpose   String   @default("register") // register / reset / login
+  expired   Boolean  @default(false)
+  used      Boolean  @default(false)
+  expiresAt DateTime // 过期时间
+  createdAt DateTime @default(now())
+
+  @@index([email, purpose])
+}

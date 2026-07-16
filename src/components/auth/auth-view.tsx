@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { api } from '@/lib/helpers'
 import { Button } from '@/components/ui/button'
@@ -38,7 +38,41 @@ export function AuthView() {
   const [regPassword, setRegPassword] = useState('')
   const [regName, setRegName] = useState('')
   const [regPenName, setRegPenName] = useState('')
+  const [regCode, setRegCode] = useState('')
   const [regLoading, setRegLoading] = useState(false)
+  const [codeSending, setCodeSending] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+
+  // 倒计时
+  useEffect(() => {
+    if (countdown <= 0) return
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [countdown])
+
+  const handleSendCode = async () => {
+    if (!regEmail.trim()) {
+      toast.error('请先输入邮箱')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail)) {
+      toast.error('邮箱格式不正确')
+      return
+    }
+    setCodeSending(true)
+    try {
+      const r = await api<{ ok: boolean; message?: string }>('/api/auth/send-code', {
+        method: 'POST',
+        body: JSON.stringify({ email: regEmail, purpose: 'register' }),
+      })
+      toast.success(r.message || '验证码已发送')
+      setCountdown(60)
+    } catch (e: any) {
+      toast.error(e.message || '发送失败')
+    } finally {
+      setCodeSending(false)
+    }
+  }
 
   const handleLogin = async () => {
     if (!loginEmail.trim() || !loginPassword) {
@@ -70,6 +104,10 @@ export function AuthView() {
       toast.error('密码至少 6 位')
       return
     }
+    if (!regCode.trim()) {
+      toast.error('请输入邮箱验证码')
+      return
+    }
     setRegLoading(true)
     try {
       const r = await api<{ user: UserPublic }>('/api/auth/register', {
@@ -79,6 +117,7 @@ export function AuthView() {
           password: regPassword,
           name: regName,
           penName: regPenName,
+          code: regCode,
         }),
       })
       setUser(r.user)
@@ -218,6 +257,39 @@ export function AuthView() {
                     />
                   </div>
                 </div>
+
+                {/* 验证码 */}
+                <div className="space-y-2">
+                  <Label>邮箱验证码 *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={regCode}
+                      onChange={(e) => setRegCode(e.target.value)}
+                      placeholder="6 位验证码"
+                      maxLength={6}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSendCode}
+                      disabled={codeSending || countdown > 0}
+                      className="shrink-0 w-32"
+                    >
+                      {codeSending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : countdown > 0 ? (
+                        `${countdown}s 后重发`
+                      ) : (
+                        '发送验证码'
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    验证码将发送至你的邮箱，10 分钟内有效
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>用户名</Label>

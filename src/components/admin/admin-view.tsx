@@ -32,10 +32,14 @@ import {
   FileText,
   Zap,
   RefreshCw,
+  Mail,
+  Send,
+  Save,
+  Server,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-type AdminTab = 'overview' | 'users' | 'novels' | 'orders' | 'messages'
+type AdminTab = 'overview' | 'users' | 'novels' | 'orders' | 'messages' | 'email'
 
 export function AdminView() {
   const [tab, setTab] = useState<AdminTab>('overview')
@@ -54,7 +58,7 @@ export function AdminView() {
         </div>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as AdminTab)}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto">
             <TabsTrigger value="overview" className="gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" />
               总览
@@ -75,6 +79,10 @@ export function AdminView() {
               <MessageSquare className="w-3.5 h-3.5" />
               AI日志
             </TabsTrigger>
+            <TabsTrigger value="email" className="gap-1.5">
+              <Mail className="w-3.5 h-3.5" />
+              邮箱配置
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-4">
@@ -91,6 +99,9 @@ export function AdminView() {
           </TabsContent>
           <TabsContent value="messages" className="mt-4">
             <MessagesTab />
+          </TabsContent>
+          <TabsContent value="email" className="mt-4">
+            <EmailConfigTab />
           </TabsContent>
         </Tabs>
       </div>
@@ -802,6 +813,344 @@ function MessagesTab() {
             下一页
           </Button>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ============ 邮箱配置 ============
+function EmailConfigTab() {
+  const [config, setConfig] = useState<any>(null)
+  const [presets, setPresets] = useState<Record<string, any>>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testEmail, setTestEmail] = useState('')
+
+  const [smtpHost, setSmtpHost] = useState('')
+  const [smtpPort, setSmtpPort] = useState(465)
+  const [smtpSecure, setSmtpSecure] = useState(true)
+  const [smtpUser, setSmtpUser] = useState('')
+  const [smtpPass, setSmtpPass] = useState('')
+  const [fromName, setFromName] = useState('墨灵写作')
+  const [enabled, setEnabled] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await api<{ config: any; presets: Record<string, any> }>('/api/admin/email-config')
+      setConfig(r.config)
+      setPresets(r.presets || {})
+      if (r.config) {
+        setSmtpHost(r.config.smtpHost || '')
+        setSmtpPort(r.config.smtpPort || 465)
+        setSmtpSecure(r.config.smtpSecure ?? true)
+        setSmtpUser(r.config.smtpUser || '')
+        setSmtpPass('')
+        setFromName(r.config.fromName || '墨灵写作')
+        setEnabled(r.config.enabled ?? true)
+      }
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const handleSave = async () => {
+    if (!smtpHost.trim() || !smtpUser.trim()) {
+      toast.error('请填写 SMTP 服务器和邮箱账号')
+      return
+    }
+    if (!smtpPass && !config?.hasPassword) {
+      toast.error('请填写邮箱密码或授权码')
+      return
+    }
+    setSaving(true)
+    try {
+      await api('/api/admin/email-config', {
+        method: 'POST',
+        body: JSON.stringify({
+          smtpHost,
+          smtpPort: Number(smtpPort),
+          smtpSecure,
+          smtpUser,
+          smtpPass: smtpPass || '******',
+          fromName,
+          enabled,
+        }),
+      })
+      toast.success('配置已保存')
+      setSmtpPass('')
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePreset = (key: string) => {
+    const p = presets[key]
+    if (!p) return
+    setSmtpHost(p.host)
+    setSmtpPort(p.port)
+    setSmtpSecure(p.secure)
+    toast.info(`已应用 ${key} 预设：${p.help}`)
+  }
+
+  const handleTest = async () => {
+    if (!testEmail.trim()) {
+      toast.error('请输入测试收件邮箱')
+      return
+    }
+    setTesting(true)
+    try {
+      const r = await api<{ ok: boolean; message?: string }>('/api/admin/email-test', {
+        method: 'POST',
+        body: JSON.stringify({ targetEmail: testEmail.trim() }),
+      })
+      toast.success(r.message || '测试邮件发送成功')
+      load()
+    } catch (e: any) {
+      toast.error('测试失败：' + e.message)
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleToggleEnabled = async () => {
+    try {
+      await api('/api/admin/email-config', {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled: !enabled }),
+      })
+      setEnabled(!enabled)
+      toast.success(!enabled ? '邮件服务已启用' : '邮件服务已禁用')
+      load()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin" />
+      </div>
+    )
+  }
+
+  const currentPresetKey = Object.keys(presets).find((k) => presets[k].host === smtpHost)
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Server className="w-4 h-4" />
+            邮件服务状态
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {config ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge
+                  variant="outline"
+                  className={
+                    enabled
+                      ? 'text-emerald-600 border-emerald-300'
+                      : 'text-amber-600 border-amber-300'
+                  }
+                >
+                  {enabled ? '● 已启用' : '● 已禁用'}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  SMTP：{config.smtpHost}:{config.smtpPort} ({config.smtpSecure ? 'SSL' : 'STARTTLS'})
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  发件账号：{config.smtpUser}
+                </span>
+                <Button variant="outline" size="sm" onClick={handleToggleEnabled} className="ml-auto">
+                  {enabled ? '禁用' : '启用'}
+                </Button>
+              </div>
+              {config.lastTestAt && (
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  {config.lastTestOk ? (
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                  ) : (
+                    <Ban className="w-3 h-3 text-red-500" />
+                  )}
+                  上次测试：{formatTime(config.lastTestAt)}
+                  {!config.lastTestOk && config.lastTestErr && (
+                    <span className="text-red-500"> - {config.lastTestErr.slice(0, 100)}</span>
+                  )}
+                </div>
+              )}
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded p-3 text-xs text-amber-800 dark:text-amber-200">
+                ⓘ 配置好 SMTP 后，用户注册时将必须通过邮箱验证码验证才能完成注册。
+                未配置或禁用时，注册功能将不可用。
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <Mail className="w-10 h-10 mx-auto text-muted-foreground mb-2 opacity-40" />
+              <p className="text-sm font-medium">尚未配置邮件服务</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                配置后用户注册将需要邮箱验证码
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Server className="w-4 h-4" />
+            {config ? '修改 SMTP 配置' : '配置 SMTP 邮箱'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>常见邮箱预设</Label>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(presets).map(([k, p]: [string, any]) => (
+                <Button
+                  key={k}
+                  variant={smtpHost === p.host ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handlePreset(k)}
+                  className="text-xs"
+                >
+                  {k}
+                </Button>
+              ))}
+            </div>
+            {currentPresetKey && (
+              <p className="text-xs text-muted-foreground">
+                {presets[currentPresetKey]?.help}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>SMTP 服务器地址 *</Label>
+              <Input
+                value={smtpHost}
+                onChange={(e) => setSmtpHost(e.target.value)}
+                placeholder="如 smtp.163.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>SMTP 端口</Label>
+              <Input
+                type="number"
+                value={smtpPort}
+                onChange={(e) => setSmtpPort(Number(e.target.value))}
+                placeholder="465 / 587"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>加密方式</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={smtpSecure ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSmtpSecure(true)}
+                  className="flex-1"
+                >
+                  SSL (465)
+                </Button>
+                <Button
+                  type="button"
+                  variant={!smtpSecure ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSmtpSecure(false)}
+                  className="flex-1"
+                >
+                  STARTTLS (587)
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>邮箱账号 *</Label>
+              <Input
+                type="email"
+                value={smtpUser}
+                onChange={(e) => setSmtpUser(e.target.value)}
+                placeholder="如 moling_support@163.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>密码 / 授权码 {config?.hasPassword && '(已设置，留空保留)'}</Label>
+              <Input
+                type="password"
+                value={smtpPass}
+                onChange={(e) => setSmtpPass(e.target.value)}
+                placeholder={config?.hasPassword ? '••••••（保留原密码留空）' : '邮箱密码或授权码'}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>发件人显示名</Label>
+              <Input
+                value={fromName}
+                onChange={(e) => setFromName(e.target.value)}
+                placeholder="墨灵写作"
+              />
+            </div>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded p-3 text-xs text-blue-800 dark:text-blue-200 space-y-1">
+            <p className="font-medium">📌 网易 163 邮箱注意事项：</p>
+            <p>1. 必须使用「授权码」而非邮箱登录密码</p>
+            <p>2. 在 163 邮箱设置 → POP3/SMTP/IMAP 中开启 SMTP 服务</p>
+            <p>3. 在「客户端授权密码」中生成授权码</p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              保存配置
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {config && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Send className="w-4 h-4" />
+              发送测试邮件
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="输入收件邮箱地址"
+              />
+              <Button onClick={handleTest} disabled={testing} className="gap-1.5 shrink-0">
+                {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                发送测试
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              建议使用与配置邮箱不同的地址进行测试，以验证邮件投递是否正常。
+            </p>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { hashPassword, signToken, COOKIE_NAME, COOKIE_MAX_AGE, userPublic, ensureAdminUser } from '@/lib/auth'
+import { verifyCode } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name, penName } = await req.json()
+    const { email, password, name, penName, code } = await req.json()
     if (!email?.trim() || !password) {
       return NextResponse.json({ error: '请输入邮箱和密码' }, { status: 400 })
     }
@@ -14,18 +15,29 @@ export async function POST(req: NextRequest) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: '邮箱格式不正确' }, { status: 400 })
     }
+    if (!code) {
+      return NextResponse.json({ error: '请输入邮箱验证码' }, { status: 400 })
+    }
 
     // 确保管理员账号存在
     await ensureAdminUser()
 
-    const existing = await db.user.findUnique({ where: { email: email.toLowerCase() } })
+    const lowerEmail = email.toLowerCase()
+
+    // 校验验证码
+    const verifyResult = await verifyCode(lowerEmail, code, 'register')
+    if (!verifyResult.ok) {
+      return NextResponse.json({ error: verifyResult.error }, { status: 400 })
+    }
+
+    const existing = await db.user.findUnique({ where: { email: lowerEmail } })
     if (existing) {
       return NextResponse.json({ error: '该邮箱已注册' }, { status: 400 })
     }
 
     const user = await db.user.create({
       data: {
-        email: email.toLowerCase(),
+        email: lowerEmail,
         password: hashPassword(password),
         name: name || email.split('@')[0],
         penName: penName || name || email.split('@')[0],

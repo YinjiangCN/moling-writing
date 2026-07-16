@@ -101,3 +101,64 @@ Stage Summary:
 - 管理员后台：5 个 Tab 完整覆盖用户/作品/订单/AI日志/平台总览
 - 所有 API 都有权限校验，401/402 错误前端正确处理
 - 演示账号：管理员 admin@moli.com / admin123
+
+---
+Task ID: extend-2
+Agent: 主 Agent (fullstack-dev)
+Task: 实现邮件验证功能 - 管理员后台配置 SMTP，用户注册时邮箱验证码验证
+
+Work Log:
+- 扩展 Prisma schema：新增 EmailConfig（管理员 SMTP 配置，单条记录全局唯一）和 EmailCode（验证码）模型
+- 安装 nodemailer@9.0.3 + @types/nodemailer
+- 创建 src/lib/email.ts 工具库：
+  * getEmailConfig / createTransporter - 获取配置并创建 SMTP transporter
+  * sendTestEmail - 发送测试邮件（HTML 模板，渐变标题）
+  * sendVerificationCode - 发送验证码邮件（6 位数字大字体展示）
+  * generateCode - 生成 6 位随机验证码
+  * createAndSaveCode - 创建并保存验证码（同时作废之前的同邮箱未使用码）
+  * verifyCode - 校验验证码（检查 used/expired/expiresAt，校验后标记 used）
+  * SMTP_PRESETS - 7 个常见邮箱预设（163/126/qq/gmail/outlook/aliyun/tencent）
+- 创建 /api/admin/email-config GET/POST/PATCH 路由：
+  * GET 返回配置（密码字段返回 ******）
+  * POST 创建或更新（密码字段为 '******' 或空时保留原密码）
+  * PATCH 单独切换 enabled 状态
+- 创建 /api/admin/email-test POST 路由：发送测试邮件，记录 lastTestAt/lastTestOk/lastTestErr
+- 创建 /api/auth/send-code POST 路由：
+  * 邮箱格式校验
+  * 注册场景检查邮箱是否已注册
+  * 60 秒频率限制
+  * 创建验证码 + 发送邮件
+- 创建 /api/auth/verify-code POST 路由：独立校验验证码
+- 改造 /api/auth/register：强制要求 code 参数，调用 verifyCode 校验通过后才创建用户
+- 管理员后台新增「邮箱配置」Tab：
+  * 状态卡片：显示当前 SMTP 配置 + 启用/禁用切换 + 上次测试结果
+  * 配置表单：7 个预设快捷按钮 + SMTP 服务器/端口/加密方式/账号/密码/发件人名
+  * 网易 163 邮箱注意事项提示
+  * 测试邮件发送区
+- 注册页面增加验证码字段：
+  * 邮箱输入框下方新增「邮箱验证码 *」字段
+  * 「发送验证码」按钮 + 60 秒倒计时
+  * 验证码 10 分钟有效提示
+  * handleRegister 强制要求验证码
+- ESLint 通过
+- Agent Browser 端到端验证：
+  * 管理员登录后看到「邮箱配置」Tab（共 6 个 Tab）
+  * 点击「163」预设，自动填入 smtp.163.com:465 SSL
+  * 填入 moling_support@163.com + 密码，点击「保存配置」成功
+  * 状态卡片显示「● 已启用」+ SMTP 信息 + 发件账号
+  * 点击「发送测试」邮件，UI 显示具体错误：「Invalid login: 550 User has no permission」
+  * 退出登录，注册页面显示「邮箱验证码」字段 + 「发送验证码」按钮
+  * 输入假验证码注册，返回「验证码错误或已失效」
+  * 禁用邮件服务后，用户发送验证码返回「邮件服务未配置或已禁用，请联系管理员」
+  * 重新启用邮件服务，UI 显示「邮件服务已启用」
+
+Stage Summary:
+- 邮件验证功能完整实现，覆盖管理员 SMTP 配置 + 用户注册验证码完整流程
+- 数据库：新增 EmailConfig 和 EmailCode 表
+- 工具库：src/lib/email.ts 封装所有邮件相关操作
+- API：4 个新路由 + 1 个改造路由
+- 前端：管理员后台新增 Tab + 注册页面新增验证码步骤
+- 已知限制：
+  * 用户提供的 163 密码是邮箱登录密码，不是 SMTP 授权码
+  * 163 邮箱要求使用「客户端授权密码」，需用户在 163 邮箱后台开启 SMTP 服务并生成授权码
+  * UI 已明确提示此注意事项
