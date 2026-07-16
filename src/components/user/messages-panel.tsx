@@ -160,7 +160,7 @@ export function MessagesPanel() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
+      <CardContent className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />

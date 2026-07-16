@@ -38,6 +38,8 @@ import {
   Receipt,
   Ticket,
   Gift,
+  Bell,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MessagesPanel } from './messages-panel'
@@ -60,6 +62,8 @@ interface UserData {
   }
 }
 
+type Section = 'profile' | 'recharge' | 'messages' | 'redeem' | 'orders'
+
 export function UserCenter() {
   const [data, setData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -70,6 +74,7 @@ export function UserCenter() {
   const [payDialog, setPayDialog] = useState<{ pkg: any; orderId: string } | null>(null)
   const [payMethod, setPayMethod] = useState('alipay')
   const [paying, setPaying] = useState(false)
+  const [section, setSection] = useState<Section>('profile')
 
   const load = async () => {
     try {
@@ -160,12 +165,12 @@ export function UserCenter() {
   if (loading || !data) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-muted-foreground">加载中...</div>
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
-  // 生成全年热力图
+  // 年度热力图
   const heatmapData = (() => {
     const map = new Map(data.stats.heatmap.map((h) => [h.date, h.words]))
     const days: { date: string; words: number }[] = []
@@ -177,359 +182,119 @@ export function UserCenter() {
     }
     return days
   })()
-
-  // 按周分组
   const weeks: { date: string; words: number }[][] = []
   for (let i = 0; i < heatmapData.length; i += 7) {
     weeks.push(heatmapData.slice(i, i + 7))
   }
 
+  // 侧栏菜单
+  const navs: { id: Section; label: string; icon: any; badge?: number }[] = [
+    { id: 'profile', label: '资料与统计', icon: UserIcon },
+    { id: 'recharge', label: '充值与会员', icon: Crown },
+    { id: 'messages', label: '消息中心', icon: Bell },
+    { id: 'redeem', label: '兑换码', icon: Ticket },
+    { id: 'orders', label: '充值记录', icon: Receipt, badge: orders.length },
+  ]
+
   return (
     <div className="flex-1 overflow-auto">
-      <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* 用户信息卡 */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row items-start gap-6">
-              <Avatar className="w-20 h-20">
-                <AvatarFallback className="bg-gradient-to-br from-violet-500 to-pink-500 text-white text-2xl">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        {/* 顶部用户信息卡（精简） */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <Avatar className="w-14 h-14">
+                <AvatarFallback className="bg-gradient-to-br from-violet-500 to-pink-500 text-white text-xl">
                   {(penName || name || 'W').slice(0, 1)}
                 </AvatarFallback>
               </Avatar>
-
-              <div className="flex-1 space-y-4 w-full">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>用户名</Label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>笔名</Label>
-                    <Input value={penName} onChange={(e) => setPenName(e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 flex-wrap">
-                  <span className="text-sm text-muted-foreground">
-                    <UserIcon className="w-3.5 h-3.5 inline mr-1" />
-                    {data.user.email}
-                  </span>
-                  <Badge variant="outline" className="gap-1.5">
-                    <Sparkles className="w-3 h-3 text-amber-500" />
-                    {data.user.tokens.toLocaleString()} Token
-                  </Badge>
-                  <Badge variant="outline" className="text-violet-600 border-violet-300 gap-1.5">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-base flex items-center gap-2">
+                  {penName || name || '未命名'}
+                  <Badge variant="outline" className="text-violet-600 border-violet-300 gap-1 text-xs">
                     <Crown className="w-3 h-3" />
-                    {data.user.plan === 'pro'
-                      ? '月卡会员'
-                      : data.user.plan === 'year'
-                      ? '年卡会员'
-                      : '免费用户'}
+                    {data.user.plan === 'pro' ? '月卡' : data.user.plan === 'year' ? '年卡' : '免费'}
                   </Badge>
-                  <Button onClick={handleSave} size="sm" className="ml-auto">
-                    保存
-                  </Button>
                 </div>
+                <div className="text-xs text-muted-foreground">{data.user.email}</div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary" className="gap-1.5 px-3 py-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="font-mono text-sm">{data.user.tokens.toLocaleString()}</span>
+                  <span className="text-muted-foreground text-xs">Token</span>
+                </Badge>
+                <Badge variant="outline" className="gap-1 px-2 py-1.5 text-xs">
+                  <FileText className="w-3 h-3" />
+                  {formatWords(data.stats.totalWords)} 字
+                </Badge>
+                <Badge variant="outline" className="gap-1 px-2 py-1.5 text-xs">
+                  <BookOpen className="w-3 h-3" />
+                  {data.stats.novelCount} 部作品
+                </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* 创作统计 */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">今日字数</CardTitle>
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatWords(data.stats.todayWords)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">总字数</CardTitle>
-              <FileText className="w-4 h-4 text-violet-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatWords(data.stats.totalWords)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">作品数</CardTitle>
-              <BookOpen className="w-4 h-4 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{data.stats.novelCount}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* 全年热力图 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              年度创作热力图
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <div className="flex gap-1 min-w-max">
-                {weeks.map((week, wi) => (
-                  <div key={wi} className="flex flex-col gap-1">
-                    {week.map((day) => {
-                      const intensity = Math.min(4, Math.floor(day.words / 1500))
-                      const colors = [
-                        'bg-muted',
-                        'bg-emerald-200 dark:bg-emerald-900',
-                        'bg-emerald-400 dark:bg-emerald-700',
-                        'bg-emerald-500 dark:bg-emerald-600',
-                        'bg-emerald-600 dark:bg-emerald-500',
-                      ]
-                      return (
-                        <div
-                          key={day.date}
-                          title={`${day.date}：${day.words} 字`}
-                          className={`w-3 h-3 rounded-sm ${colors[intensity]}`}
-                        />
-                      )
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-              <span>少</span>
-              <div className="w-3 h-3 rounded-sm bg-muted" />
-              <div className="w-3 h-3 rounded-sm bg-emerald-200 dark:bg-emerald-900" />
-              <div className="w-3 h-3 rounded-sm bg-emerald-400 dark:bg-emerald-700" />
-              <div className="w-3 h-3 rounded-sm bg-emerald-500" />
-              <div className="w-3 h-3 rounded-sm bg-emerald-600" />
-              <span>多</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 充值与会员 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" />
-                Token 充值
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {packages.length === 0 ? (
-                <div className="text-xs text-muted-foreground text-center py-4">
-                  <Loader2 className="w-4 h-4 animate-spin inline mr-1" />
-                  加载套餐...
-                </div>
-              ) : (
-                packages.map((p) => (
-                  <div
-                    key={p.id}
-                    className={`flex items-center justify-between p-3 border rounded-lg ${
-                      p.popular ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : ''
-                    }`}
-                  >
-                    <div>
-                      <div className="font-semibold">
-                        {p.tokens.toLocaleString()} Token
-                        {p.popular && (
-                          <Badge className="ml-2 bg-amber-500" variant="default">
-                            推荐
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{p.name}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-lg">¥{p.price}</div>
-                      <Button size="sm" variant="outline" onClick={() => handleRecharge(p)}>
-                        购买
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-              <p className="text-xs text-muted-foreground text-center pt-2">
-                演示版：点击购买后弹出模拟支付窗，无需真实扣款
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Crown className="w-4 h-4 text-violet-500" />
-                会员订阅
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                {
-                  plan: 'free',
-                  name: '免费版',
-                  price: '¥0',
-                  features: ['每日 5000 Token', '基础 AI 模型', '最多 3 部小说'],
-                  current: data.user.plan === 'free',
-                },
-                {
-                  plan: 'pro',
-                  name: '月卡会员',
-                  price: '¥29.9/月',
-                  features: ['每日 50000 Token', '高级 AI 模型', '无限小说数量', '专属预设指令库'],
-                  current: data.user.plan === 'pro',
-                  popular: true,
-                },
-                {
-                  plan: 'year',
-                  name: '年卡会员',
-                  price: '¥299/年',
-                  features: ['月卡全部权益', '每日 200000 Token', '专属客服', '优先新功能体验'],
-                  current: data.user.plan === 'year',
-                },
-              ].map((p) => (
-                <div
-                  key={p.plan}
-                  className={`p-3 border rounded-lg ${
-                    p.popular ? 'border-violet-300 bg-violet-50 dark:bg-violet-950/20' : ''
-                  } ${p.current ? 'ring-2 ring-emerald-400' : ''}`}
+        {/* 左侧栏 + 右侧内容区 */}
+        <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6">
+          {/* 左侧栏 */}
+          <nav className="space-y-1 lg:sticky lg:top-4 lg:self-start">
+            {navs.map((n) => {
+              const Icon = n.icon
+              const active = section === n.id
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => setSection(n.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition ${
+                    active
+                      ? 'bg-gradient-to-r from-violet-500 to-pink-500 text-white shadow-md'
+                      : 'hover:bg-muted text-foreground'
+                  }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-semibold flex items-center gap-2">
-                      {p.name}
-                      {p.popular && (
-                        <Badge className="bg-violet-500" variant="default">
-                          热门
-                        </Badge>
-                      )}
-                      {p.current && (
-                        <Badge variant="outline" className="text-emerald-600 border-emerald-300">
-                          当前
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="font-bold">{p.price}</div>
-                  </div>
-                  <ul className="text-xs space-y-1 mb-2">
-                    {p.features.map((f) => (
-                      <li key={f} className="flex items-center gap-1.5">
-                        <Check className="w-3 h-3 text-emerald-500" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  {!p.current && (
-                    <Button
-                      size="sm"
-                      variant={p.popular ? 'default' : 'outline'}
-                      className="w-full"
-                      onClick={() => handleUpgrade(p.plan)}
+                  <Icon className={`w-4 h-4 ${active ? 'text-white' : 'text-muted-foreground'}`} />
+                  <span className="flex-1 text-left">{n.label}</span>
+                  {n.badge !== undefined && n.badge > 0 && (
+                    <Badge
+                      variant={active ? 'secondary' : 'outline'}
+                      className={`text-[10px] px-1.5 py-0 ${active ? '' : 'text-muted-foreground'}`}
                     >
-                      {p.plan === 'free' ? '降级到免费' : `升级到${p.name}`}
-                    </Button>
+                      {n.badge}
+                    </Badge>
                   )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                </button>
+              )
+            })}
+          </nav>
+
+          {/* 右侧内容区 */}
+          <div className="space-y-6 min-w-0">
+            {section === 'profile' && (
+              <ProfileSection
+                data={data}
+                name={name}
+                penName={penName}
+                setName={setName}
+                setPenName={setPenName}
+                onSave={handleSave}
+                weeks={weeks}
+              />
+            )}
+            {section === 'recharge' && (
+              <RechargeSection
+                packages={packages}
+                currentPlan={data.user.plan}
+                onRecharge={handleRecharge}
+                onUpgrade={handleUpgrade}
+              />
+            )}
+            {section === 'messages' && <MessagesPanel />}
+            {section === 'redeem' && <RedeemCard onRedeemed={load} />}
+            {section === 'orders' && <OrdersSection orders={orders} />}
+          </div>
         </div>
-
-        {/* 消息中心 */}
-        <MessagesPanel />
-
-        {/* 兑换码 */}
-        <RedeemCard onRedeemed={load} />
-
-        {/* 充值记录 */}
-        {orders.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Receipt className="w-4 h-4" />
-                充值记录
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto max-h-80 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 text-xs sticky top-0">
-                    <tr>
-                      <th className="text-left p-3">订单号</th>
-                      <th className="text-left p-3">套餐</th>
-                      <th className="text-left p-3">金额</th>
-                      <th className="text-left p-3">状态</th>
-                      <th className="text-left p-3">时间</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((o: any) => (
-                      <tr key={o.id} className="border-t">
-                        <td className="p-3 font-mono text-xs">{o.id.slice(-8)}</td>
-                        <td className="p-3 text-xs">
-                          {o.tokens.toLocaleString()} Token
-                        </td>
-                        <td className="p-3 font-semibold">¥{o.amount.toFixed(2)}</td>
-                        <td className="p-3">
-                          {o.status === 'paid' ? (
-                            <Badge variant="outline" className="text-emerald-600 border-emerald-300 text-xs">
-                              已支付
-                            </Badge>
-                          ) : o.status === 'failed' ? (
-                            <Badge variant="outline" className="text-red-600 border-red-300 text-xs">
-                              失败
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
-                              待支付
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-3 text-xs text-muted-foreground">
-                          {formatTime(o.createdAt)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 功能预告 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              高级功能（即将上线）
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              {[
-                { name: '社区广场', desc: '发布作品、读者互动、月票打赏' },
-                { name: '多端同步', desc: '手机、平板、桌面无缝衔接' },
-                { name: '版本历史', desc: '自动快照、回滚历史版本' },
-                { name: '回收站', desc: '30 天可恢复，防误删' },
-                { name: '导入导出', desc: 'TXT/Word/EPUB/Markdown' },
-                { name: 'API Key 绑定', desc: '自定义 AI 模型与价格' },
-              ].map((f) => (
-                <div key={f.name} className="flex items-start gap-2 p-3 bg-muted/40 rounded">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
-                  <div>
-                    <div className="font-medium">{f.name}</div>
-                    <div className="text-xs text-muted-foreground">{f.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* 模拟支付对话框 */}
@@ -593,6 +358,340 @@ export function UserCenter() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// ============ 资料与统计 ============
+function ProfileSection({
+  data,
+  name,
+  penName,
+  setName,
+  setPenName,
+  onSave,
+  weeks,
+}: {
+  data: UserData
+  name: string
+  penName: string
+  setName: (v: string) => void
+  setPenName: (v: string) => void
+  onSave: () => void
+  weeks: { date: string; words: number }[][]
+}) {
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <UserIcon className="w-4 h-4" />
+            个人资料
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>用户名</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="你的昵称" />
+            </div>
+            <div className="space-y-2">
+              <Label>笔名</Label>
+              <Input value={penName} onChange={(e) => setPenName(e.target.value)} placeholder="将显示在作品中" />
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            <UserIcon className="w-3 h-3 inline mr-1" />
+            {data.user.email}
+          </div>
+          <Button onClick={onSave} size="sm" className="gap-1.5">
+            <Check className="w-3.5 h-3.5" />
+            保存修改
+          </Button>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">今日字数</CardTitle>
+            <TrendingUp className="w-4 h-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatWords(data.stats.todayWords)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">总字数</CardTitle>
+            <FileText className="w-4 h-4 text-violet-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatWords(data.stats.totalWords)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">作品数</CardTitle>
+            <BookOpen className="w-4 h-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data.stats.novelCount}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            年度创作热力图
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="flex gap-1 min-w-max">
+              {weeks.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-1">
+                  {week.map((day) => {
+                    const intensity = Math.min(4, Math.floor(day.words / 1500))
+                    const colors = [
+                      'bg-muted',
+                      'bg-emerald-200 dark:bg-emerald-900',
+                      'bg-emerald-400 dark:bg-emerald-700',
+                      'bg-emerald-500 dark:bg-emerald-600',
+                      'bg-emerald-600 dark:bg-emerald-500',
+                    ]
+                    return (
+                      <div
+                        key={day.date}
+                        title={`${day.date}：${day.words} 字`}
+                        className={`w-3 h-3 rounded-sm ${colors[intensity]}`}
+                      />
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
+            <span>少</span>
+            <div className="w-3 h-3 rounded-sm bg-muted" />
+            <div className="w-3 h-3 rounded-sm bg-emerald-200 dark:bg-emerald-900" />
+            <div className="w-3 h-3 rounded-sm bg-emerald-400 dark:bg-emerald-700" />
+            <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+            <div className="w-3 h-3 rounded-sm bg-emerald-600" />
+            <span>多</span>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
+// ============ 充值与会员 ============
+function RechargeSection({
+  packages,
+  currentPlan,
+  onRecharge,
+  onUpgrade,
+}: {
+  packages: any[]
+  currentPlan: string
+  onRecharge: (pkg: any) => void
+  onUpgrade: (plan: string) => void
+}) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-500" />
+            Token 充值
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {packages.length === 0 ? (
+            <div className="text-xs text-muted-foreground text-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin inline mr-1" />
+              加载套餐...
+            </div>
+          ) : (
+            packages.map((p) => (
+              <div
+                key={p.id}
+                className={`flex items-center justify-between p-3 border rounded-lg ${
+                  p.popular ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : ''
+                }`}
+              >
+                <div>
+                  <div className="font-semibold">
+                    {p.tokens.toLocaleString()} Token
+                    {p.popular && (
+                      <Badge className="ml-2 bg-amber-500" variant="default">
+                        推荐
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{p.name}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-lg">¥{p.price}</div>
+                  <Button size="sm" variant="outline" onClick={() => onRecharge(p)}>
+                    购买
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+          <p className="text-xs text-muted-foreground text-center pt-2">
+            演示版：点击购买后弹出模拟支付窗，无需真实扣款
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Crown className="w-4 h-4 text-violet-500" />
+            会员订阅
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[
+            {
+              plan: 'free',
+              name: '免费版',
+              price: '¥0',
+              features: ['每日 5000 Token', '基础 AI 模型', '最多 3 部小说'],
+              current: currentPlan === 'free',
+            },
+            {
+              plan: 'pro',
+              name: '月卡会员',
+              price: '¥29.9/月',
+              features: ['每日 50000 Token', '高级 AI 模型', '无限小说数量', '专属预设指令库'],
+              current: currentPlan === 'pro',
+              popular: true,
+            },
+            {
+              plan: 'year',
+              name: '年卡会员',
+              price: '¥299/年',
+              features: ['月卡全部权益', '每日 200000 Token', '专属客服', '优先新功能体验'],
+              current: currentPlan === 'year',
+            },
+          ].map((p) => (
+            <div
+              key={p.plan}
+              className={`p-3 border rounded-lg ${
+                p.popular ? 'border-violet-300 bg-violet-50 dark:bg-violet-950/20' : ''
+              } ${p.current ? 'ring-2 ring-emerald-400' : ''}`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-semibold flex items-center gap-2">
+                  {p.name}
+                  {p.popular && (
+                    <Badge className="bg-violet-500" variant="default">
+                      热门
+                    </Badge>
+                  )}
+                  {p.current && (
+                    <Badge variant="outline" className="text-emerald-600 border-emerald-300">
+                      当前
+                    </Badge>
+                  )}
+                </div>
+                <div className="font-bold">{p.price}</div>
+              </div>
+              <ul className="text-xs space-y-1 mb-2">
+                {p.features.map((f) => (
+                  <li key={f} className="flex items-center gap-1.5">
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              {!p.current && (
+                <Button
+                  size="sm"
+                  variant={p.popular ? 'default' : 'outline'}
+                  className="w-full"
+                  onClick={() => onUpgrade(p.plan)}
+                >
+                  {p.plan === 'free' ? '降级到免费' : `升级到${p.name}`}
+                </Button>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ============ 充值记录 ============
+function OrdersSection({ orders }: { orders: any[] }) {
+  if (orders.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="py-12 text-center text-muted-foreground">
+          <Receipt className="w-10 h-10 mx-auto mb-2 opacity-40" />
+          <p className="text-sm font-medium">暂无充值记录</p>
+          <p className="text-xs mt-1">前往「充值与会员」购买套餐</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Receipt className="w-4 h-4" />
+          充值记录
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs sticky top-0">
+              <tr>
+                <th className="text-left p-3">订单号</th>
+                <th className="text-left p-3">套餐</th>
+                <th className="text-left p-3">金额</th>
+                <th className="text-left p-3">状态</th>
+                <th className="text-left p-3">时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o: any) => (
+                <tr key={o.id} className="border-t">
+                  <td className="p-3 font-mono text-xs">{o.id.slice(-8)}</td>
+                  <td className="p-3 text-xs">{o.tokens.toLocaleString()} Token</td>
+                  <td className="p-3 font-semibold">¥{o.amount.toFixed(2)}</td>
+                  <td className="p-3">
+                    {o.status === 'paid' ? (
+                      <Badge variant="outline" className="text-emerald-600 border-emerald-300 text-xs">
+                        已支付
+                      </Badge>
+                    ) : o.status === 'failed' ? (
+                      <Badge variant="outline" className="text-red-600 border-red-300 text-xs">
+                        失败
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
+                        待支付
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground">{formatTime(o.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
