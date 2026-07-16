@@ -7,14 +7,16 @@ import { EditorView } from '@/components/editor/editor-view'
 import { SettingsLibrary } from '@/components/settings/settings-library'
 import { UserCenter } from '@/components/user/user-center'
 import { TopBar } from '@/components/layout/top-bar'
+import { AuthView } from '@/components/auth/auth-view'
+import { AdminView } from '@/components/admin/admin-view'
+import { AutoSerialPanel } from '@/components/editor/auto-serial-panel'
 
 export default function Home() {
-  const { view, theme, currentNovelId } = useAppStore()
-  // 用 useState 初始化 mounted=true，避免 effect 中 setState 警告
+  const { view, theme, currentNovelId, user, authLoading } = useAppStore()
   const [mounted] = useState(true)
 
   useEffect(() => {
-    // 应用主题（仅操作 DOM，无 setState）
+    // 应用主题
     const root = document.documentElement
     root.classList.remove('dark', 'theme-eye')
     if (theme === 'dark') root.classList.add('dark')
@@ -23,6 +25,31 @@ export default function Home() {
 
   if (!mounted) return null
 
+  // 鉴权加载中
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <TopBar />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-muted-foreground text-sm">加载中...</div>
+        </main>
+      </div>
+    )
+  }
+
+  // 未登录 - 显示登录/注册页
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <TopBar />
+        <main className="flex-1 flex overflow-hidden">
+          <AuthView />
+        </main>
+      </div>
+    )
+  }
+
+  // 已登录
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <TopBar />
@@ -31,6 +58,12 @@ export default function Home() {
         {view === 'editor' && currentNovelId && <EditorView />}
         {view === 'settings' && <SettingsLibrary />}
         {view === 'user' && <UserCenter />}
+        {view === 'admin' && user.role === 'admin' && <AdminView />}
+        {view === 'admin' && user.role !== 'admin' && (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            无权访问管理后台
+          </div>
+        )}
       </main>
     </div>
   )

@@ -93,9 +93,15 @@ export function AiAssistant({ novelId, chapterId, onInsertText }: Props) {
         { role: 'assistant', content: r.reply, preset },
       ])
     } catch (e: any) {
+      const errorMsg =
+        e?.status === 401
+          ? '登录已过期，请重新登录后继续使用 AI。'
+          : e?.status === 402
+          ? e.reply || 'Token 余额不足，请前往用户中心充值。'
+          : `抱歉，出错了：${e.message}`
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `抱歉，出错了：${e.message}` },
+        { role: 'assistant', content: errorMsg },
       ])
     } finally {
       setLoading(false)

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireSessionOr401 } from '@/lib/auth'
 
-// GET /api/chapters?novelId=xxx 获取某小说所有章节(按卷组织)
 export async function GET(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const url = new URL(req.url)
   const novelId = url.searchParams.get('novelId')
   const id = url.searchParams.get('id')
@@ -21,8 +24,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ chapters })
 }
 
-// POST - 创建章节/卷
 export async function POST(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const body = await req.json()
   const { type = 'chapter', title, volumeId, novelId, isOutline = false } = body
 
@@ -44,7 +49,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ volume })
   }
 
-  // chapter
   if (!volumeId) return NextResponse.json({ error: '需要 volumeId' }, { status: 400 })
   const maxOrder = await db.chapter.aggregate({
     where: { volumeId },
@@ -61,8 +65,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ chapter })
 }
 
-// PATCH - 更新章节内容/标题/状态/排序
 export async function PATCH(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const body = await req.json()
   const { id, content, title, status, sortOrder, summary, volumeId } = body
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })
@@ -80,7 +86,6 @@ export async function PATCH(req: NextRequest) {
 
   const chapter = await db.chapter.update({ where: { id }, data })
 
-  // 更新小说总字数
   if (content !== undefined && chapter.novelId) {
     const agg = await db.chapter.aggregate({
       where: { novelId: chapter.novelId },
@@ -91,7 +96,6 @@ export async function PATCH(req: NextRequest) {
       data: { totalWords: agg._sum.words || 0 },
     })
 
-    // 更新每日统计
     const today = new Date().toISOString().slice(0, 10)
     const user = await db.user.findFirst({ where: { novels: { some: { id: chapter.novelId } } } })
     if (user) {
@@ -101,11 +105,11 @@ export async function PATCH(req: NextRequest) {
       if (existing) {
         await db.dailyStat.update({
           where: { id: existing.id },
-          data: { words: existing.words + (data.words - (chapter.words || 0)) },
+          data: { words: existing.words + Math.max(0, (data.words || 0) - (chapter.words || 0)) },
         })
       } else {
         await db.dailyStat.create({
-          data: { userId: user.id, date: today, words: data.words },
+          data: { userId: user.id, date: today, words: data.words || 0 },
         })
       }
     }
@@ -114,8 +118,10 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ chapter })
 }
 
-// DELETE
 export async function DELETE(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const url = new URL(req.url)
   const id = url.searchParams.get('id')
   const type = url.searchParams.get('type')

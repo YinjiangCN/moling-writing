@@ -13,11 +13,14 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
+  password     String   // scrypt 哈希
   name         String?
   penName      String?
   avatar       String?
-  tokens       Int      @default(100000) // Token 余额
+  tokens       Int      @default(10000) // Token 余额
   plan         String   @default("free") // free / pro / year
+  role         String   @default("user") // user / admin
+  banned       Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -28,6 +31,42 @@ model User {
   items        Item[]
   chatMessages ChatMessage[]
   dailyStats   DailyStat[]
+  orders       Order[]
+  autoSerials  AutoSerial[]
+}
+
+// 充值订单
+model Order {
+  id        String    @id @default(cuid())
+  userId    String
+  amount    Float     // 金额（元）
+  tokens    Int       // 购买的 Token 数
+  status    String    @default("pending") // pending / paid / failed
+  method    String    @default("alipay") // alipay / wechat / card
+  createdAt DateTime  @default(now())
+  paidAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// AI 自动连载任务
+model AutoSerial {
+  id             String   @id @default(cuid())
+  novelId        String
+  userId         String
+  enabled        Boolean  @default(true)
+  intervalMin    Int      @default(60) // 每次生成间隔（分钟）
+  targetWords    Int      @default(2000) // 每章目标字数
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  status         String   @default("idle") // idle / running / paused / error
+  totalGenerated Int      @default(0) // 已自动生成章节数
+  lastError      String?
+  plotDirection  String?  // 剧情走向提示（用户给 AI 的方向）
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  novel          Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // 每日创作统计 (热力图用)
@@ -59,24 +98,25 @@ model Folder {
 
 // ============ 小说 ============
 model Novel {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   cover       String?
   author      String?
-  genre       String   @default("玄幻") // 玄幻/言情/科幻/悬疑/历史/都市
-  tags        String   @default("") // 逗号分隔
-  synopsis    String?  // 简介
-  outline     String?  // 大纲
-  status      String   @default("ongoing") // ongoing / completed / hiatus
-  totalWords  Int      @default(0)
+  genre       String        @default("玄幻")
+  tags        String        @default("")
+  synopsis    String?
+  outline     String?
+  status      String        @default("ongoing") // ongoing / completed / hiatus
+  totalWords  Int           @default(0)
   folderId    String?
-  folder      Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder      Folder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   volumes     Volume[]
   chapters    Chapter[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  autoSerials AutoSerial[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 // 卷
@@ -84,7 +124,7 @@ model Volume {
   id        String   @id @default(cuid())
   title     String
   sortOrder Int      @default(0)
-  isOutline Boolean  @default(false) // 大纲卷
+  isOutline Boolean  @default(false)
   novelId   String
   novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
   chapters  Chapter[]
@@ -97,10 +137,11 @@ model Chapter {
   id         String   @id @default(cuid())
   title      String
   content    String   @default("")
-  summary    String?  // 章节核心事件摘要
+  summary    String?
   words      Int      @default(0)
   status     String   @default("draft") // draft / polishing / final
   sortOrder  Int      @default(0)
+  autoGen    Boolean  @default(false) // 是否由 AI 自动连载生成
   volumeId   String
   volume     Volume   @relation(fields: [volumeId], references: [id], onDelete: Cascade)
   novelId    String
@@ -110,7 +151,6 @@ model Chapter {
 }
 
 // ============ 设定库 ============
-// 角色卡
 model Character {
   id         String   @id @default(cuid())
   name       String
@@ -118,20 +158,19 @@ model Character {
   appearance String?
   personality String?
   background String?
-  abilities  String? // 功法/技能
-  relations  String? // 人物关系 JSON
-  novelId    String? // 可绑定到具体小说，也可全局
+  abilities  String?
+  relations  String?
+  novelId    String?
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
 
-// 世界观/地图
 model Worldview {
   id          String   @id @default(cuid())
   name        String
-  type        String   @default("geography") // geography / faction / history
+  type        String   @default("geography")
   description String?
   novelId     String?
   userId      String
@@ -140,12 +179,11 @@ model Worldview {
   updatedAt   DateTime @updatedAt
 }
 
-// 道具/功法
 model Item {
   id          String   @id @default(cuid())
   name        String
-  type        String   @default("item") // item / skill
-  attributes  String?  // 属性 JSON
+  type        String   @default("item")
+  attributes  String?
   effect      String?
   novelId     String?
   userId      String
@@ -156,14 +194,14 @@ model Item {
 
 // ============ AI 对话历史 ============
 model ChatMessage {
-  id        String   @id @default(cuid())
-  role      String   // user / assistant / system
-  content   String
-  preset    String?  // 使用的预设指令 ID
-  novelId   String?  // 关联的小说
-  chapterId String?  // 关联的章节
-  tokensUsed Int     @default(0)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  role       String   // user / assistant / system
+  content    String
+  preset     String?
+  novelId    String?
+  chapterId  String?
+  tokensUsed Int      @default(0)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
 }

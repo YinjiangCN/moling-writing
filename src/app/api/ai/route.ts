@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireSessionOr401 } from '@/lib/auth'
 import ZAI from 'z-ai-web-dev-sdk'
-
-async function getCurrentUser() {
-  let user = await db.user.findFirst()
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        email: 'writer@aistory.com',
-        name: '资深码字人',
-        penName: '云中鹤',
-        tokens: 88888,
-        plan: 'pro',
-      },
-    })
-  }
-  return user
-}
 
 // 预设指令库
 export const PRESETS: Record<string, { name: string; category: string; system: string; description: string }> = {
@@ -121,7 +106,18 @@ export const PRESETS: Record<string, { name: string; category: string; system: s
 // POST /api/ai - 通用 AI 调用
 export async function POST(req: NextRequest) {
   try {
-    const user = await getCurrentUser()
+    const session = await requireSessionOr401()
+    if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+    const user = session.user
+
+    // 余额检查
+    if (user.tokens <= 0) {
+      return NextResponse.json(
+        { error: 'Token 余额不足，请充值', reply: '您的 Token 余额不足，请前往用户中心充值。' },
+        { status: 402 }
+      )
+    }
+
     const body = await req.json()
     const { action, preset, message, context, novelId, chapterId, targetStyle } = body
 
@@ -224,8 +220,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/ai/presets - 获取预设列表
+// GET /api/ai/presets - 获取预设列表（需要登录）
 export async function GET() {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
   return NextResponse.json({
     presets: Object.entries(PRESETS).map(([id, p]) => ({ id, ...p })),
   })

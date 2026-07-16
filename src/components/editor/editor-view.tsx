@@ -6,6 +6,7 @@ import { api, countWords, formatWords } from '@/lib/helpers'
 import { ChapterTree } from './chapter-tree'
 import { EditorPanel } from './editor-panel'
 import { AiAssistant } from '@/components/ai/ai-assistant'
+import { AutoSerialPanel } from './auto-serial-panel'
 import { Button } from '@/components/ui/button'
 import { PanelLeft, PanelRight, Eye, Moon, Sun, Type, Sparkles } from 'lucide-react'
 import {
@@ -239,6 +240,8 @@ export function EditorView() {
         <span className="text-muted-foreground">{currentChapter?.title || '未选择章节'}</span>
 
         <div className="ml-auto flex items-center gap-2">
+          <AutoSerialPanel novelId={novel.id} />
+
           {saving ? (
             <span className="text-amber-500 flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />

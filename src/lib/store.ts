@@ -2,9 +2,26 @@
 
 import { create } from 'zustand'
 
-export type ViewType = 'workspace' | 'editor' | 'settings' | 'user'
+export type ViewType = 'workspace' | 'editor' | 'settings' | 'user' | 'admin' | 'login' | 'register'
+
+interface UserPublic {
+  id: string
+  email: string
+  name: string | null
+  penName: string | null
+  avatar: string | null
+  tokens: number
+  plan: string
+  role: string
+  banned: boolean
+  createdAt: string
+}
 
 interface AppState {
+  // 鉴权
+  user: UserPublic | null
+  authLoading: boolean
+
   // 视图状态
   view: ViewType
   currentNovelId: string | null
@@ -22,6 +39,8 @@ interface AppState {
   presetOpen: boolean
 
   // Actions
+  setUser: (u: UserPublic | null) => void
+  setAuthLoading: (b: boolean) => void
   setView: (v: ViewType) => void
   openNovel: (novelId: string) => void
   setCurrentChapter: (id: string | null) => void
@@ -36,6 +55,9 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  user: null,
+  authLoading: true,
+
   view: 'workspace',
   currentNovelId: null,
   currentChapterId: null,
@@ -49,6 +71,8 @@ export const useAppStore = create<AppState>((set) => ({
   aiPanelOpen: true,
   presetOpen: false,
 
+  setUser: (u) => set({ user: u }),
+  setAuthLoading: (b) => set({ authLoading: b }),
   setView: (v) => set({ view: v }),
   openNovel: (novelId) =>
     set({ view: 'editor', currentNovelId: novelId, currentChapterId: null }),

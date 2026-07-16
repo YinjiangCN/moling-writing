@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-
-// 简单的"当前用户"模拟 - 单用户系统中固定一个用户
-async function getCurrentUser() {
-  let user = await db.user.findFirst()
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        email: 'writer@aistory.com',
-        name: '资深码字人',
-        penName: '云中鹤',
-        tokens: 88888,
-        plan: 'pro',
-      },
-    })
-  }
-  return user
-}
+import { requireSessionOr401 } from '@/lib/auth'
 
 // GET /api/folders - 获取所有文件夹（含小说数与字数）
 export async function GET() {
-  const user = await getCurrentUser()
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+  const user = session.user
+
   const folders = await db.folder.findMany({
     where: { userId: user.id, parentId: null },
     include: {
@@ -34,7 +21,6 @@ export async function GET() {
     orderBy: { sortOrder: 'asc' },
   })
 
-  // 计算每个文件夹的小说数和总字数（含子文件夹）
   const calc = (folder: any): { novelCount: number; totalWords: number } => {
     let novelCount = folder.novels?.length || 0
     let totalWords = folder.novels?.reduce((s: number, n: any) => s + (n.totalWords || 0), 0) || 0
@@ -55,9 +41,11 @@ export async function GET() {
   return NextResponse.json({ folders: result })
 }
 
-// POST /api/folders - 创建文件夹
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser()
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+  const user = session.user
+
   const body = await req.json()
   const { name, color = 'slate', parentId = null } = body
   if (!name?.trim()) return NextResponse.json({ error: '名称不能为空' }, { status: 400 })
@@ -79,8 +67,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ folder })
 }
 
-// PATCH /api/folders - 更新文件夹
 export async function PATCH(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const body = await req.json()
   const { id, name, color, sortOrder, parentId } = body
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })
@@ -95,8 +85,10 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ folder })
 }
 
-// DELETE /api/folders?id=xxx
 export async function DELETE(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const url = new URL(req.url)
   const id = url.searchParams.get('id')
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })

@@ -1,25 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-
-async function getCurrentUser() {
-  let user = await db.user.findFirst()
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        email: 'writer@aistory.com',
-        name: '资深码字人',
-        penName: '云中鹤',
-        tokens: 88888,
-        plan: 'pro',
-      },
-    })
-  }
-  return user
-}
+import { requireSessionOr401 } from '@/lib/auth'
 
 // GET /api/novels?folderId=xxx 或 /api/novels?id=xxx
 export async function GET(req: NextRequest) {
-  const user = await getCurrentUser()
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+  const user = session.user
+
   const url = new URL(req.url)
   const id = url.searchParams.get('id')
   const folderId = url.searchParams.get('folderId')
@@ -34,6 +22,7 @@ export async function GET(req: NextRequest) {
             chapters: { orderBy: { sortOrder: 'asc' } },
           },
         },
+        autoSerials: true,
       },
     })
     if (!novel || novel.userId !== user.id) {
@@ -51,18 +40,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ novels })
 }
 
-// POST /api/novels - 创建小说（可带 AI 生成内容）
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser()
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+  const user = session.user
+
   const body = await req.json()
-  const { title, cover, author, genre, tags, synopsis, outline, folderId, generateFromIdea } = body
+  const { title, cover, author, genre, tags, synopsis, outline, folderId } = body
 
   if (!title?.trim()) return NextResponse.json({ error: '书名不能为空' }, { status: 400 })
 
-  let finalSynopsis = synopsis || ''
-  let finalOutline = outline || ''
-
-  // 如果有灵感关键词但没有简介/大纲，可由前端先调用 AI 生成后传入
   const novel = await db.novel.create({
     data: {
       title: title.trim(),
@@ -70,35 +57,27 @@ export async function POST(req: NextRequest) {
       author: author || user.penName || user.name || '匿名',
       genre: genre || '玄幻',
       tags: tags || '',
-      synopsis: finalSynopsis,
-      outline: finalOutline,
+      synopsis: synopsis || '',
+      outline: outline || '',
       folderId: folderId || null,
       userId: user.id,
     },
   })
 
-  // 默认创建第一卷和第一章
   const volume = await db.volume.create({
-    data: {
-      title: '第一卷',
-      sortOrder: 0,
-      novelId: novel.id,
-    },
+    data: { title: '第一卷', sortOrder: 0, novelId: novel.id },
   })
   await db.chapter.create({
-    data: {
-      title: '第一章',
-      sortOrder: 0,
-      volumeId: volume.id,
-      novelId: novel.id,
-    },
+    data: { title: '第一章', sortOrder: 0, volumeId: volume.id, novelId: novel.id },
   })
 
   return NextResponse.json({ novel })
 }
 
-// PATCH - 更新
 export async function PATCH(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const body = await req.json()
   const { id, ...data } = body
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })
@@ -113,8 +92,10 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ novel })
 }
 
-// DELETE
 export async function DELETE(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const url = new URL(req.url)
   const id = url.searchParams.get('id')
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })

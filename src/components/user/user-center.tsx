@@ -1,13 +1,27 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api, formatWords } from '@/lib/helpers'
+import { api, formatWords, formatTime } from '@/lib/helpers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   User as UserIcon,
   Sparkles,
@@ -20,6 +34,8 @@ import {
   Settings,
   CreditCard,
   Check,
+  Loader2,
+  Receipt,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -46,6 +62,11 @@ export function UserCenter() {
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
   const [penName, setPenName] = useState('')
+  const [orders, setOrders] = useState<any[]>([])
+  const [packages, setPackages] = useState<any[]>([])
+  const [payDialog, setPayDialog] = useState<{ pkg: any; orderId: string } | null>(null)
+  const [payMethod, setPayMethod] = useState('alipay')
+  const [paying, setPaying] = useState(false)
 
   const load = async () => {
     try {
@@ -54,14 +75,25 @@ export function UserCenter() {
       setName(r.user.name || '')
       setPenName(r.user.penName || '')
     } catch (e: any) {
-      toast.error(e.message)
+      if (e?.status !== 401) toast.error(e.message)
     } finally {
       setLoading(false)
     }
   }
 
+  const loadOrders = async () => {
+    try {
+      const r = await api<{ orders: any[]; packages: any[] }>('/api/orders')
+      setOrders(r.orders)
+      setPackages(r.packages)
+    } catch (e: any) {
+      // 静默
+    }
+  }
+
   useEffect(() => {
     load()
+    loadOrders()
   }, [])
 
   const handleSave = async () => {
@@ -77,17 +109,35 @@ export function UserCenter() {
     }
   }
 
-  const handleRecharge = async (tokens: number) => {
-    if (!data) return
+  const handleRecharge = async (pkg: any) => {
     try {
-      await api('/api/user', {
-        method: 'PATCH',
-        body: JSON.stringify({ tokens: data.user.tokens + tokens }),
+      const r = await api<{ order: any; package: any }>('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify({ packageId: pkg.id, method: payMethod }),
       })
-      toast.success(`已充值 ${tokens} Token`)
-      load()
+      setPayDialog({ pkg: r.package, orderId: r.order.id })
+      toast.info('订单已创建，请在弹窗中完成支付')
     } catch (e: any) {
       toast.error(e.message)
+    }
+  }
+
+  const handlePay = async () => {
+    if (!payDialog) return
+    setPaying(true)
+    try {
+      const r = await api<{ ok: boolean; newBalance: number }>(
+        `/api/orders?id=${payDialog.orderId}`,
+        { method: 'PATCH' }
+      )
+      toast.success(`支付成功！Token 已到账 ${r.newBalance.toLocaleString()}`)
+      setPayDialog(null)
+      load()
+      loadOrders()
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setPaying(false)
     }
   }
 
@@ -269,38 +319,41 @@ export function UserCenter() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[
-                { tokens: 50000, price: '¥9.9', desc: '入门体验' },
-                { tokens: 200000, price: '¥29.9', desc: '常用之选', popular: true },
-                { tokens: 1000000, price: '¥99.9', desc: '深度创作' },
-              ].map((p) => (
-                <div
-                  key={p.tokens}
-                  className={`flex items-center justify-between p-3 border rounded-lg ${
-                    p.popular ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : ''
-                  }`}
-                >
-                  <div>
-                    <div className="font-semibold">
-                      {p.tokens.toLocaleString()} Token
-                      {p.popular && (
-                        <Badge className="ml-2 bg-amber-500" variant="default">
-                          推荐
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">{p.desc}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-lg">{p.price}</div>
-                    <Button size="sm" variant="outline" onClick={() => handleRecharge(p.tokens)}>
-                      充值
-                    </Button>
-                  </div>
+              {packages.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-4">
+                  <Loader2 className="w-4 h-4 animate-spin inline mr-1" />
+                  加载套餐...
                 </div>
-              ))}
+              ) : (
+                packages.map((p) => (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between p-3 border rounded-lg ${
+                      p.popular ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : ''
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold">
+                        {p.tokens.toLocaleString()} Token
+                        {p.popular && (
+                          <Badge className="ml-2 bg-amber-500" variant="default">
+                            推荐
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{p.name}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-lg">¥{p.price}</div>
+                      <Button size="sm" variant="outline" onClick={() => handleRecharge(p)}>
+                        购买
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
               <p className="text-xs text-muted-foreground text-center pt-2">
-                演示版：充值不扣款，仅模拟 Token 到账
+                演示版：点击购买后弹出模拟支付窗，无需真实扣款
               </p>
             </CardContent>
           </Card>
@@ -383,6 +436,62 @@ export function UserCenter() {
           </Card>
         </div>
 
+        {/* 充值记录 */}
+        {orders.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Receipt className="w-4 h-4" />
+                充值记录
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-xs sticky top-0">
+                    <tr>
+                      <th className="text-left p-3">订单号</th>
+                      <th className="text-left p-3">套餐</th>
+                      <th className="text-left p-3">金额</th>
+                      <th className="text-left p-3">状态</th>
+                      <th className="text-left p-3">时间</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((o: any) => (
+                      <tr key={o.id} className="border-t">
+                        <td className="p-3 font-mono text-xs">{o.id.slice(-8)}</td>
+                        <td className="p-3 text-xs">
+                          {o.tokens.toLocaleString()} Token
+                        </td>
+                        <td className="p-3 font-semibold">¥{o.amount.toFixed(2)}</td>
+                        <td className="p-3">
+                          {o.status === 'paid' ? (
+                            <Badge variant="outline" className="text-emerald-600 border-emerald-300 text-xs">
+                              已支付
+                            </Badge>
+                          ) : o.status === 'failed' ? (
+                            <Badge variant="outline" className="text-red-600 border-red-300 text-xs">
+                              失败
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
+                              待支付
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-3 text-xs text-muted-foreground">
+                          {formatTime(o.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* 功能预告 */}
         <Card>
           <CardHeader>
@@ -413,6 +522,67 @@ export function UserCenter() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 模拟支付对话框 */}
+      <Dialog open={!!payDialog} onOpenChange={(v) => !v && setPayDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              模拟支付
+            </DialogTitle>
+          </DialogHeader>
+          {payDialog && (
+            <div className="space-y-4 py-2">
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">套餐</span>
+                  <span className="font-medium">{payDialog.pkg.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Token 数量</span>
+                  <span className="font-medium">{payDialog.pkg.tokens.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">订单号</span>
+                  <span className="font-mono text-xs">{payDialog.orderId.slice(-12)}</span>
+                </div>
+                <div className="border-t pt-2 mt-2 flex justify-between">
+                  <span className="font-medium">应付金额</span>
+                  <span className="font-bold text-lg text-violet-600">¥{payDialog.pkg.price}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>支付方式</Label>
+                <Select value={payMethod} onValueChange={setPayMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alipay">支付宝</SelectItem>
+                    <SelectItem value="wechat">微信支付</SelectItem>
+                    <SelectItem value="card">银行卡</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded p-3 text-xs text-amber-700 dark:text-amber-300">
+                ⓘ 这是演示环境，点击下方按钮即可"完成支付"并自动到账 Token。无需真实扣款。
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayDialog(null)}>
+              取消
+            </Button>
+            <Button onClick={handlePay} disabled={paying} className="gap-1.5">
+              {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              确认支付 ¥{payDialog?.pkg.price}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

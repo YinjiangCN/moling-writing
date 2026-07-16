@@ -1,0 +1,12 @@
+{
+  "name": "auto-serial-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "z-ai-web-dev-sdk": "^0.0.18"
+  }
+}

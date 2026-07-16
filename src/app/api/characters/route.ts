@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireSessionOr401 } from '@/lib/auth'
 
-async function getCurrentUser() {
-  let user = await db.user.findFirst()
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        email: 'writer@aistory.com',
-        name: '资深码字人',
-        penName: '云中鹤',
-        tokens: 88888,
-        plan: 'pro',
-      },
-    })
-  }
-  return user
-}
-
-// 通用 CRUD for Character / Worldview / Item
 export async function GET(req: NextRequest) {
-  const user = await getCurrentUser()
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+  const user = session.user
+
   const url = new URL(req.url)
   const novelId = url.searchParams.get('novelId')
   const type = url.searchParams.get('type') || 'character'
@@ -39,7 +26,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser()
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+  const user = session.user
+
   const body = await req.json()
   const { type = 'character', novelId, ...fields } = body
 
@@ -78,11 +68,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const body = await req.json()
   const { id, type = 'character', ...fields } = body
   if (!id) return NextResponse.json({ error: '需要 id' }, { status: 400 })
 
-  // 只允许更新白名单字段
   const allowed: Record<string, string[]> = {
     character: ['name', 'avatar', 'appearance', 'personality', 'background', 'abilities', 'relations', 'novelId'],
     worldview: ['name', 'type', 'description', 'novelId'],
@@ -102,6 +94,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+
   const url = new URL(req.url)
   const id = url.searchParams.get('id')
   const type = url.searchParams.get('type') || 'character'

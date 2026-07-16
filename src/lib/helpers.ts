@@ -16,11 +16,32 @@ export async function api<T = any>(
 
   const res = await fetch(finalUrl, {
     ...rest,
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       ...(rest?.headers || {}),
     },
   })
+
+  // 401 抛出特殊错误，前端可识别并跳转登录
+  if (res.status === 401) {
+    const err = new Error('未登录') as any
+    err.code = 'UNAUTHORIZED'
+    err.status = 401
+    throw err
+  }
+
+  if (res.status === 402) {
+    const err = new Error('余额不足') as any
+    err.code = 'INSUFFICIENT_TOKENS'
+    err.status = 402
+    try {
+      const data = await res.json()
+      err.reply = data.reply
+    } catch {}
+    throw err
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
@@ -32,6 +53,20 @@ export async function api<T = any>(
 export function countWords(text: string): number {
   if (!text) return 0
   return text.replace(/\s/g, '').length
+}
+
+// 统一处理 API 错误：401 跳登录、402 提示充值
+export function handleApiError(e: any, toast?: any): boolean {
+  if (e?.code === 'UNAUTHORIZED' || e?.status === 401) {
+    if (toast) toast.error('请先登录')
+    return true
+  }
+  if (e?.code === 'INSUFFICIENT_TOKENS' || e?.status === 402) {
+    if (toast) toast.error('Token 余额不足，请充值')
+    return true
+  }
+  if (toast) toast.error(e.message || '操作失败')
+  return false
 }
 
 // 格式化字数

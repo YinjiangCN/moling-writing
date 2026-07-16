@@ -1,42 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-
-async function getCurrentUser() {
-  let user = await db.user.findFirst()
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        email: 'writer@aistory.com',
-        name: '资深码字人',
-        penName: '云中鹤',
-        tokens: 88888,
-        plan: 'pro',
-      },
-    })
-  }
-  return user
-}
+import { requireSessionOr401 } from '@/lib/auth'
 
 // GET /api/user - 获取当前用户信息+统计
 export async function GET() {
-  const user = await getCurrentUser()
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+  const user = session.user
 
-  // 今日字数
   const today = new Date().toISOString().slice(0, 10)
   const todayStat = await db.dailyStat.findUnique({
     where: { userId_date: { userId: user.id, date: today } },
   })
 
-  // 总字数
   const totalWordsAgg = await db.novel.aggregate({
     where: { userId: user.id },
     _sum: { totalWords: true },
   })
 
-  // 小说数
   const novelCount = await db.novel.count({ where: { userId: user.id } })
 
-  // 最近30天热力图
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 60)
   const stats = await db.dailyStat.findMany({
@@ -52,6 +35,7 @@ export async function GET() {
       avatar: user.avatar,
       tokens: user.tokens,
       plan: user.plan,
+      role: user.role,
     },
     stats: {
       todayWords: todayStat?.words || 0,
@@ -62,9 +46,11 @@ export async function GET() {
   })
 }
 
-// PATCH - 更新用户信息
 export async function PATCH(req: NextRequest) {
-  const user = await getCurrentUser()
+  const session = await requireSessionOr401()
+  if (!session.ok) return NextResponse.json({ error: session.error }, { status: 401 })
+  const user = session.user
+
   const body = await req.json()
   const { name, penName, avatar, plan } = body
   const data: any = {}
@@ -73,6 +59,7 @@ export async function PATCH(req: NextRequest) {
   if (avatar !== undefined) data.avatar = avatar
   if (plan !== undefined) data.plan = plan
 
+  // 注意：tokens 由充值 API 修改，不在此处直接设置
   const updated = await db.user.update({ where: { id: user.id }, data })
   return NextResponse.json({ user: updated })
 }
