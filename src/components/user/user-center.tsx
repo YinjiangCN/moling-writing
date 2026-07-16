@@ -38,11 +38,9 @@ import {
   Receipt,
   Ticket,
   Gift,
-  Bell,
   Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { MessagesPanel } from './messages-panel'
 
 interface UserData {
   user: {
@@ -62,7 +60,7 @@ interface UserData {
   }
 }
 
-type Section = 'profile' | 'recharge' | 'messages' | 'redeem' | 'orders'
+type Section = 'profile' | 'recharge' | 'redeem' | 'orders'
 
 export function UserCenter() {
   const [data, setData] = useState<UserData | null>(null)
@@ -191,7 +189,6 @@ export function UserCenter() {
   const navs: { id: Section; label: string; icon: any; badge?: number }[] = [
     { id: 'profile', label: '资料与统计', icon: UserIcon },
     { id: 'recharge', label: '充值与会员', icon: Crown },
-    { id: 'messages', label: '消息中心', icon: Bell },
     { id: 'redeem', label: '兑换码', icon: Ticket },
     { id: 'orders', label: '充值记录', icon: Receipt, badge: orders.length },
   ]
@@ -290,7 +287,6 @@ export function UserCenter() {
                 onUpgrade={handleUpgrade}
               />
             )}
-            {section === 'messages' && <MessagesPanel />}
             {section === 'redeem' && <RedeemCard onRedeemed={load} />}
             {section === 'orders' && <OrdersSection orders={orders} />}
           </div>

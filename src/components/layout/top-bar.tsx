@@ -2,7 +2,8 @@
 
 import { useAppStore } from '@/lib/store'
 import { LayoutGrid, Settings, User, Sparkles, PenLine, Shield, LogOut, Loader2, Bell, Megaphone } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { MessagesDialog } from '@/components/user/messages-dialog'
 import { api } from '@/lib/helpers'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,6 +35,19 @@ export function TopBar() {
   const { user, setUser, authLoading, view, setView, backToWorkspace } = useAppStore()
   const [tokens, setTokens] = useState<number | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [messagesOpen, setMessagesOpen] = useState(false)
+
+  // 拉取未读数（供 MessagesDialog 通过 onUnreadChange 回调更新）
+  const fetchUnread = useCallback(async () => {
+    if (!user) return
+    try {
+      const [msgR, annR] = await Promise.all([
+        api<{ unreadCount: number }>('/api/messages').catch(() => ({ unreadCount: 0 })),
+        api<{ unreadCount: number }>('/api/announcements').catch(() => ({ unreadCount: 0 })),
+      ])
+      setUnreadCount((msgR.unreadCount || 0) + (annR.unreadCount || 0))
+    } catch {}
+  }, [user])
 
   // 启动时拉取当前用户
   useEffect(() => {
@@ -60,15 +74,9 @@ export function TopBar() {
     let mounted = true
     const load = async () => {
       try {
-        const [userR, msgR, annR] = await Promise.all([
-          api<{ user: { tokens: number } }>('/api/user'),
-          api<{ unreadCount: number }>('/api/messages').catch(() => ({ unreadCount: 0 })),
-          api<{ unreadCount: number }>('/api/announcements').catch(() => ({ unreadCount: 0 })),
-        ])
-        if (mounted) {
-          setTokens(userR.user.tokens)
-          setUnreadCount((msgR.unreadCount || 0) + (annR.unreadCount || 0))
-        }
+        const userR = await api<{ user: { tokens: number } }>('/api/user')
+        if (mounted) setTokens(userR.user.tokens)
+        await fetchUnread()
       } catch {}
     }
     load()
@@ -77,7 +85,13 @@ export function TopBar() {
       mounted = false
       clearInterval(i)
     }
-  }, [user, view])
+  }, [user, view, fetchUnread])
+
+  // 关闭弹窗后刷新未读数
+  const handleMessagesOpenChange = (open: boolean) => {
+    setMessagesOpen(open)
+    if (!open) fetchUnread()
+  }
 
   const handleLogout = async () => {
     try {
@@ -165,12 +179,12 @@ export function TopBar() {
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
-        {/* 消息铃铛 */}
+        {/* 消息铃铛 - 点击直接弹出弹窗 */}
         <Button
           variant="ghost"
           size="icon"
           className="relative h-8 w-8"
-          onClick={() => setView('user')}
+          onClick={() => setMessagesOpen(true)}
           title="平台消息与公告"
         >
           <Bell className="w-4 h-4" />
@@ -230,6 +244,13 @@ export function TopBar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* 消息中心弹窗 */}
+      <MessagesDialog
+        open={messagesOpen}
+        onOpenChange={handleMessagesOpenChange}
+        onUnreadChange={setUnreadCount}
+      />
     </header>
   )
 }
