@@ -101,6 +101,66 @@ export const PRESETS: Record<string, { name: string; category: string; system: s
     description: '扩写角色/设定背景',
     system: '你是设定扩写专家。根据用户的简单几个词，生成完整、有细节、有故事感的角色小传或背景设定，200-400字。',
   },
+  gen_character: {
+    name: 'AI 生成角色',
+    category: '设定',
+    description: '根据小说类型+关键词自动生成角色卡',
+    system: `你是网文角色设计专家。根据用户提供的小说类型和关键词，生成一个完整的角色设定。
+请严格按以下格式输出（每项一行，用「：」分隔标题和内容）：
+姓名：xxx
+外貌：xxx（50字内）
+性格：xxx（30字内）
+背景：xxx（100字内）
+功法/能力：xxx（50字内）
+人物关系：xxx（如：父亲：李老汉；挚友：王二）
+不要输出其他内容，不要加 markdown 标记。`,
+  },
+  gen_worldview: {
+    name: 'AI 生成世界观',
+    category: '设定',
+    description: '根据小说类型自动生成世界观设定',
+    system: `你是网文世界观设计专家。根据用户提供的小说类型和关键词，生成一个完整的世界观/势力/地理设定。
+请严格按以下格式输出（每项一行，用「：」分隔）：
+名称：xxx
+类型：地理/势力/历史（选一个）
+描述：xxx（200字内，包含核心特征、重要规则、与主角的关系）
+不要输出其他内容。`,
+  },
+  gen_item: {
+    name: 'AI 生成道具/功法',
+    category: '设定',
+    description: '根据小说类型自动生成道具或功法',
+    system: `你是网文道具/功法设计专家。根据用户提供的小说类型和关键词，生成一个完整的道具或功法设定。
+请严格按以下格式输出（每项一行，用「：」分隔）：
+名称：xxx
+类型：道具/功法（选一个）
+属性：xxx（等级、来源、属性等，50字内）
+效果：xxx（使用效果、副作用、限制，100字内）
+不要输出其他内容。`,
+  },
+  gen_settings_batch: {
+    name: 'AI 批量生成设定',
+    category: '设定',
+    description: '一键生成角色+世界观+道具全套设定',
+    system: `你是网文设定设计专家。根据用户提供的小说类型和主题，一次性生成全套设定（3个角色 + 2个世界观 + 2个道具/功法）。
+
+请严格按以下 JSON 格式输出（不要加 markdown 代码块标记，不要输出其他内容）：
+{
+  "characters": [
+    {"name":"姓名","appearance":"外貌50字内","personality":"性格30字内","background":"背景100字内","abilities":"功法/能力50字内","relations":"人物关系"},
+    {"name":"...","appearance":"...","personality":"...","background":"...","abilities":"...","relations":"..."},
+    {"name":"...","appearance":"...","personality":"...","background":"...","abilities":"...","relations":"..."}
+  ],
+  "worldviews": [
+    {"name":"名称","type":"geography","description":"描述200字内"},
+    {"name":"...","type":"faction","description":"..."}
+  ],
+  "items": [
+    {"name":"名称","type":"item","attributes":"属性50字内","effect":"效果100字内"},
+    {"name":"...","type":"skill","attributes":"...","effect":"..."}
+  ]
+}`,
+  },
 }
 
 // POST /api/ai - 通用 AI 调用

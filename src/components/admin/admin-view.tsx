@@ -804,7 +804,7 @@ function MessagesTab() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await api('/api/admin/messages', { params: { page, pageSize: 30 } })
+      const r = await api('/api/admin/ai-logs', { params: { page, pageSize: 30 } })
       setData(r)
     } catch (e: any) {
       toast.error(e.message)
@@ -832,16 +832,36 @@ function MessagesTab() {
           <Card>
             <CardContent className="p-4">
               <div className="text-xs text-muted-foreground">总 AI 调用次数</div>
-              <div className="text-2xl font-bold">{data.stats.totalMessages}</div>
+              <div className="text-2xl font-bold">{data.stats.totalMessages || 0}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-xs text-muted-foreground">总消耗 Token</div>
-              <div className="text-2xl font-bold">{formatWords(data.stats.totalTokensUsed)}</div>
+              <div className="text-2xl font-bold">{formatWords(data.stats.totalTokensUsed || 0)}</div>
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* 预设使用统计 */}
+      {data?.stats?.presetStats?.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">预设指令使用统计</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {data.stats.presetStats.map((p: any) => (
+                <Badge key={p.preset} variant="outline" className="text-xs gap-1">
+                  {p.preset}
+                  <span className="text-muted-foreground">{p.count}次</span>
+                  <span className="text-amber-500">{formatWords(p.tokens)}T</span>
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <Card>
@@ -849,7 +869,7 @@ function MessagesTab() {
           <CardTitle className="text-base">最近 AI 调用记录</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
-          {data?.messages?.map((m: any) => (
+          {data?.items?.map((m: any) => (
             <div key={m.id} className="border rounded p-3 text-sm">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -871,11 +891,11 @@ function MessagesTab() {
                     </Badge>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {m.user?.penName || m.user?.email}
+                    {m.user?.penName || m.user?.email || '未知'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{m.tokensUsed} Token</span>
+                  <span>{m.tokensUsed || 0} Token</span>
                   <span>{formatTime(m.createdAt)}</span>
                 </div>
               </div>
@@ -884,7 +904,7 @@ function MessagesTab() {
               </p>
             </div>
           ))}
-          {data?.messages?.length === 0 && (
+          {data?.items?.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">暂无记录</div>
           )}
         </CardContent>

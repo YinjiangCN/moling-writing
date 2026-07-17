@@ -34,6 +34,7 @@ import {
   Sparkles,
   Loader2,
   Network,
+  Wand2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -70,6 +71,8 @@ export function SettingsLibrary() {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<SettingCard | null>(null)
   const [open, setOpen] = useState(false)
+  const [aiGenOpen, setAiGenOpen] = useState(false)
+  const [aiGenLoading, setAiGenLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -148,6 +151,128 @@ export function SettingsLibrary() {
     }
   }
 
+  // AI 生成单个设定（根据当前 Tab 类型）
+  const handleAIGenSingle = async (genre: string, keywords: string) => {
+    setAiGenLoading(true)
+    try {
+      const presetMap: Record<CardType, string> = {
+        character: 'gen_character',
+        worldview: 'gen_worldview',
+        item: 'gen_item',
+      }
+      const r = await api<{ reply: string }>('/api/ai', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'chat',
+          preset: presetMap[type],
+          message: `小说类型：${genre}\n关键词/要求：${keywords}`,
+        }),
+      })
+
+      // 解析 AI 返回的格式化文本
+      const lines = r.reply.split('\n').filter((l) => l.trim())
+      const parsed: any = {}
+      for (const line of lines) {
+        const idx = line.indexOf('：')
+        if (idx > 0) {
+          const key = line.slice(0, idx).trim()
+          const val = line.slice(idx + 1).trim()
+          const keyMap: Record<string, string> = {
+            '姓名': 'name', '名称': 'name',
+            '外貌': 'appearance', '性格': 'personality',
+            '背景': 'background', '功法/能力': 'abilities', '功法': 'abilities', '能力': 'abilities',
+            '人物关系': 'relations', '关系': 'relations',
+            '类型': 'type', '描述': 'description',
+            '属性': 'attributes', '效果': 'effect',
+          }
+          const mappedKey = keyMap[key]
+          if (mappedKey) parsed[mappedKey] = val
+        }
+      }
+
+      if (!parsed.name) {
+        toast.error('AI 返回格式异常，未能解析名称')
+        return
+      }
+
+      // 创建设定卡
+      await api('/api/characters', {
+        method: 'POST',
+        body: JSON.stringify({ type, ...parsed }),
+      })
+      toast.success(`AI 已生成${type === 'character' ? '角色' : type === 'worldview' ? '世界观' : '道具/功法'}：${parsed.name}`)
+      load()
+      setAiGenOpen(false)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setAiGenLoading(false)
+    }
+  }
+
+  // AI 批量生成全套设定
+  const handleAIGenBatch = async (genre: string, theme: string) => {
+    setAiGenLoading(true)
+    try {
+      const r = await api<{ reply: string }>('/api/ai', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'chat',
+          preset: 'gen_settings_batch',
+          message: `小说类型：${genre}\n主题/方向：${theme}`,
+        }),
+      })
+
+      // 尝试解析 JSON
+      let jsonStr = r.reply.trim()
+      // 去除可能的 markdown 代码块标记
+      if (jsonStr.startsWith('```')) {
+        jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
+      }
+      const data = JSON.parse(jsonStr)
+
+      let count = 0
+      // 创建角色
+      if (data.characters) {
+        for (const c of data.characters) {
+          await api('/api/characters', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'character', ...c }),
+          })
+          count++
+        }
+      }
+      // 创建世界观
+      if (data.worldviews) {
+        for (const w of data.worldviews) {
+          await api('/api/characters', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'worldview', ...w }),
+          })
+          count++
+        }
+      }
+      // 创建道具
+      if (data.items) {
+        for (const it of data.items) {
+          await api('/api/characters', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'item', ...it }),
+          })
+          count++
+        }
+      }
+
+      toast.success(`AI 批量生成完成，共 ${count} 个设定`)
+      load()
+      setAiGenOpen(false)
+    } catch (e: any) {
+      toast.error('AI 生成失败：' + e.message)
+    } finally {
+      setAiGenLoading(false)
+    }
+  }
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -158,16 +283,26 @@ export function SettingsLibrary() {
               独立管理角色、世界观、道具设定，AI 写作时自动注入上下文
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setEditing(null)
-              setOpen(true)
-            }}
-            className="gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            新建{TYPE_LABELS[type].label}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setAiGenOpen(true)}
+              variant="outline"
+              className="gap-1.5 bg-gradient-to-r from-violet-50 to-pink-50 dark:from-violet-950/30 dark:to-pink-950/20 border-violet-200 dark:border-violet-800 text-violet-600 hover:bg-violet-100 dark:hover:bg-violet-900/30"
+            >
+              <Wand2 className="w-4 h-4" />
+              AI 生成设定
+            </Button>
+            <Button
+              onClick={() => {
+                setEditing(null)
+                setOpen(true)
+              }}
+              className="gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              新建{TYPE_LABELS[type].label}
+            </Button>
+          </div>
         </div>
 
         <Tabs value={type} onValueChange={(v) => setType(v as CardType)}>
@@ -232,6 +367,16 @@ export function SettingsLibrary() {
         type={type}
         card={editing}
         onSave={handleSave}
+      />
+
+      {/* AI 生成设定对话框 */}
+      <AIGenDialog
+        open={aiGenOpen}
+        onClose={() => setAiGenOpen(false)}
+        type={type}
+        onGenSingle={handleAIGenSingle}
+        onGenBatch={handleAIGenBatch}
+        loading={aiGenLoading}
       />
     </div>
   )
@@ -538,6 +683,138 @@ function SettingCardDialog({
           </Button>
           <Button onClick={handleSave}>保存</Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============ AI 生成设定对话框 ============
+function AIGenDialog({
+  open,
+  onClose,
+  type,
+  onGenSingle,
+  onGenBatch,
+  loading,
+}: {
+  open: boolean
+  onClose: () => void
+  type: CardType
+  onGenSingle: (genre: string, keywords: string) => void
+  onGenBatch: (genre: string, theme: string) => void
+  loading: boolean
+}) {
+  const [mode, setMode] = useState<'single' | 'batch'>('single')
+  const [genre, setGenre] = useState('玄幻')
+  const [keywords, setKeywords] = useState('')
+  const [theme, setTheme] = useState('')
+
+  const typeLabel = type === 'character' ? '角色' : type === 'worldview' ? '世界观' : '道具/功法'
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wand2 className="w-4 h-4 text-violet-500" />
+            AI 自动生成设定
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          {/* 模式切换 */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant={mode === 'single' ? 'default' : 'outline'}
+              onClick={() => setMode('single')}
+              className="gap-1.5 text-sm"
+            >
+              生成单个{typeLabel}
+            </Button>
+            <Button
+              variant={mode === 'batch' ? 'default' : 'outline'}
+              onClick={() => setMode('batch')}
+              className="gap-1.5 text-sm"
+            >
+              批量生成全套
+            </Button>
+          </div>
+
+          {mode === 'single' ? (
+            <>
+              <div className="space-y-2">
+                <Label>小说类型</Label>
+                <Select value={genre} onValueChange={setGenre}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['玄幻', '言情', '科幻', '悬疑', '历史', '都市', '武侠', '游戏', '奇幻'].map((g) => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>关键词 / 要求</Label>
+                <Textarea
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  placeholder={
+                    type === 'character'
+                      ? '如：反派，冷酷，剑修，与主角有血海深仇'
+                      : type === 'worldview'
+                      ? '如：修仙宗门，位于悬崖之上，有禁地'
+                      : '如：上古神器，可操控时间，有反噬'
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-900 rounded p-3 text-xs text-violet-700 dark:text-violet-300">
+                💡 AI 会根据类型和关键词自动生成一个完整的{typeLabel}设定卡，直接保存到设定库
+              </div>
+              <Button
+                onClick={() => onGenSingle(genre, keywords)}
+                disabled={loading || !keywords.trim()}
+                className="w-full gap-1.5 bg-gradient-to-r from-violet-500 to-pink-500 hover:opacity-90"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                {loading ? 'AI 生成中...' : `生成${typeLabel}`}
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>小说类型</Label>
+                <Select value={genre} onValueChange={setGenre}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['玄幻', '言情', '科幻', '悬疑', '历史', '都市', '武侠', '游戏', '奇幻'].map((g) => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>主题 / 方向</Label>
+                <Textarea
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value)}
+                  placeholder="如：废材逆袭，系统流，校园+修仙..."
+                  rows={3}
+                />
+              </div>
+              <div className="bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-900 rounded p-3 text-xs text-violet-700 dark:text-violet-300">
+                💡 AI 会一次性生成：3 个角色 + 2 个世界观 + 2 个道具/功法，共 7 个设定卡
+              </div>
+              <Button
+                onClick={() => onGenBatch(genre, theme)}
+                disabled={loading || !theme.trim()}
+                className="w-full gap-1.5 bg-gradient-to-r from-violet-500 to-pink-500 hover:opacity-90"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                {loading ? 'AI 批量生成中...' : '批量生成全套设定'}
+              </Button>
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )
