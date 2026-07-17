@@ -48,19 +48,47 @@ interface AiConfig {
   createdAt: string
 }
 
-// 提供商配色方案
-const PROVIDER_STYLES: Record<string, { icon: string; gradient: string; bg: string; border: string; text: string }> = {
-  deepseek: { icon: '🧠', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/10', border: 'border-blue-200 dark:border-blue-800', text: 'text-blue-600' },
-  openai: { icon: '💬', gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-800', text: 'text-emerald-600' },
-  claude: { icon: '🎭', gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-500/10', border: 'border-orange-200 dark:border-orange-800', text: 'text-orange-600' },
-  gemini: { icon: '✨', gradient: 'from-violet-500 to-purple-500', bg: 'bg-violet-500/10', border: 'border-violet-200 dark:border-violet-800', text: 'text-violet-600' },
-  grok: { icon: '🤖', gradient: 'from-slate-600 to-slate-800', bg: 'bg-slate-500/10', border: 'border-slate-300 dark:border-slate-700', text: 'text-slate-600' },
-  minimax: { icon: '📊', gradient: 'from-pink-500 to-rose-500', bg: 'bg-pink-500/10', border: 'border-pink-200 dark:border-pink-800', text: 'text-pink-600' },
-  custom: { icon: '⚙️', gradient: 'from-gray-500 to-gray-600', bg: 'bg-gray-500/10', border: 'border-gray-200 dark:border-gray-800', text: 'text-gray-600' },
+// 提供商配色方案 + logo
+const PROVIDER_STYLES: Record<string, { logo: string; gradient: string; bg: string; border: string; text: string }> = {
+  deepseek: { logo: 'https://sfile.chatglm.cn/images-ppt/1c38c8be0681.jpg', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/10', border: 'border-blue-200 dark:border-blue-800', text: 'text-blue-600' },
+  openai: { logo: 'https://sfile.chatglm.cn/images-ppt/d26cbaef8fb3.png', gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-800', text: 'text-emerald-600' },
+  claude: { logo: 'https://sfile.chatglm.cn/images-ppt/e716137b2c7e.jpg', gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-500/10', border: 'border-orange-200 dark:border-orange-800', text: 'text-orange-600' },
+  gemini: { logo: 'https://sfile.chatglm.cn/images-ppt/9e2140b236e2.png', gradient: 'from-violet-500 to-purple-500', bg: 'bg-violet-500/10', border: 'border-violet-200 dark:border-violet-800', text: 'text-violet-600' },
+  grok: { logo: 'https://sfile.chatglm.cn/images-ppt/97e90381996c.jpeg', gradient: 'from-slate-600 to-slate-800', bg: 'bg-slate-500/10', border: 'border-slate-300 dark:border-slate-700', text: 'text-slate-600' },
+  minimax: { logo: 'https://sfile.chatglm.cn/images-ppt/464a6068eccc.png', gradient: 'from-pink-500 to-rose-500', bg: 'bg-pink-500/10', border: 'border-pink-200 dark:border-pink-800', text: 'text-pink-600' },
+  custom: { logo: '', gradient: 'from-gray-500 to-gray-600', bg: 'bg-gray-500/10', border: 'border-gray-200 dark:border-gray-800', text: 'text-gray-600' },
 }
 
 function getStyle(provider: string) {
   return PROVIDER_STYLES[provider] || PROVIDER_STYLES.custom
+}
+
+// 提供商 Logo 组件
+function ProviderLogo({ provider, className }: { provider: string; className?: string }) {
+  const style = getStyle(provider)
+  if (!style.logo) {
+    // 自定义 API 用 Cpu 图标
+    return <Cpu className={className || 'w-5 h-5 text-muted-foreground'} />
+  }
+  return (
+    <img
+      src={style.logo}
+      alt={provider}
+      className={`${className || 'w-5 h-5'} object-contain rounded-sm`}
+      onError={(e) => {
+        // 图片加载失败时隐藏，显示备用图标
+        const target = e.target as HTMLImageElement
+        target.style.display = 'none'
+        const parent = target.parentElement
+        if (parent && !parent.querySelector('.fallback-icon')) {
+          const fallback = document.createElement('span')
+          fallback.className = 'fallback-icon text-xs'
+          fallback.textContent = provider.slice(0, 2).toUpperCase()
+          parent.appendChild(fallback)
+        }
+      }}
+    />
+  )
 }
 
 export function AiConfigPanel() {
@@ -278,8 +306,8 @@ export function AiConfigPanel() {
                       <div className="flex-1 p-4 min-w-0">
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-9 h-9 rounded-lg ${style.bg} flex items-center justify-center text-lg shrink-0`}>
-                              {style.icon}
+                            <div className={`w-9 h-9 rounded-lg ${style.bg} flex items-center justify-center shrink-0 overflow-hidden`}>
+                              <ProviderLogo provider={c.provider} className="w-6 h-6" />
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -413,7 +441,7 @@ export function AiConfigPanel() {
                     </div>
                   )}
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xl">{style.icon}</span>
+                    <ProviderLogo provider={p.id} className="w-6 h-6" />
                     <span className="font-medium text-sm">{p.name}</span>
                   </div>
                   <div className="text-[10px] text-muted-foreground line-clamp-2">
@@ -543,7 +571,7 @@ function ConfigDialog({
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="text-lg">{style.icon}</span>
+            <ProviderLogo provider={provider} className="w-5 h-5" />
             {editing ? '编辑 API 配置' : `添加 ${preset?.name || 'API'}`}
           </DialogTitle>
         </DialogHeader>
@@ -565,7 +593,9 @@ function ConfigDialog({
                           : 'border-transparent bg-muted/40 hover:bg-muted'
                       }`}
                     >
-                      <div className="text-xl mb-0.5">{ps.icon}</div>
+                      <div className="mb-0.5 flex items-center justify-center">
+                        <ProviderLogo provider={p.id} className="w-7 h-7" />
+                      </div>
                       <div className="text-[10px] font-medium truncate">{p.name.split(' ')[0]}</div>
                     </button>
                   )
@@ -578,7 +608,7 @@ function ConfigDialog({
           {preset?.help && (
             <div className={`rounded-lg p-3 text-xs border ${style.border} ${style.bg}`}>
               <div className="flex items-start gap-2">
-                <span className="text-sm shrink-0">{style.icon}</span>
+                <ProviderLogo provider={provider} className="w-4 h-4 shrink-0" />
                 <div className="flex-1">
                   <p className={style.text}>{preset.help}</p>
                   {preset.apiKeyUrl && (
