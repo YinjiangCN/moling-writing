@@ -33,6 +33,10 @@ model User {
   dailyStats   DailyStat[]
   orders       Order[]
   autoSerials  AutoSerial[]
+  publications Publication[]
+  likes        PublicationLike[]
+  collects     PublicationCollect[]
+  readRecords  ReadRecord[]
 }
 
 // 充值订单
@@ -115,6 +119,7 @@ model Novel {
   volumes     Volume[]
   chapters    Chapter[]
   autoSerials AutoSerial[]
+  publication Publication?
   // 软删除（回收站）
   deleted     Boolean       @default(false)
   deletedAt   DateTime?
@@ -449,6 +454,9 @@ model Publication {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // 关系
+  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reads       ReadRecord[]
   likes       PublicationLike[]
   collects    PublicationCollect[]
@@ -461,7 +469,7 @@ model Publication {
 model ReadRecord {
   id              String   @id @default(cuid())
   publicationId   String
-  userId          String?
+  userId          String
   chapterId       String?
   // 阅读进度
   lastChapterSortOrder Int  @default(0)
@@ -471,6 +479,7 @@ model ReadRecord {
   createdAt       DateTime @default(now())
 
   publication     Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([publicationId, userId])
   @@index([userId])
@@ -484,6 +493,7 @@ model PublicationLike {
   createdAt     DateTime @default(now())
 
   publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([publicationId, userId])
 }
@@ -496,6 +506,7 @@ model PublicationCollect {
   createdAt     DateTime @default(now())
 
   publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([publicationId, userId])
 }

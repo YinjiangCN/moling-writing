@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   // 调用 AI（流式）
   const zai = await ZAI.create()
-  const completion = await zai.chat.completions.create({
+  const completion: any = await zai.chat.completions.create({
     messages: [
       { role: 'system', content: systemPrompt + (extraContext ? `\n\n以下是创作上下文：${extraContext}` : '') },
       { role: 'user', content: userPrompt || '请帮我继续创作。' },
@@ -76,43 +76,24 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // completion 可能是 Response 对象（stream=true 时）
-        if (completion instanceof Response) {
-          // 流式响应：completion.body 是 ReadableStream
-          const reader = (completion.body as ReadableStream<Uint8Array>).getReader()
-          const decoder = new TextDecoder()
-          let buffer = ''
+        // SDK stream=true 返回 ReadableStream
+        const reader = (completion as ReadableStream<Uint8Array>).getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
 
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buffer += decoder.decode(value, { stream: true })
-            
-            // 按行处理 SSE
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || '' // 保留不完整的行
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
 
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim()
-                if (data === '[DONE]') continue
-                try {
-                  const parsed = JSON.parse(data)
-                  const delta = parsed.choices?.[0]?.delta?.content || ''
-                  if (delta) {
-                    fullReply += delta
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
-                  }
-                } catch {
-                  // 跳过无法解析的行
-                }
-              }
-            }
-          }
-          // 处理剩余 buffer
-          if (buffer.startsWith('data: ')) {
-            const data = buffer.slice(6).trim()
-            if (data && data !== '[DONE]') {
+          // 按行处理 SSE
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim()
+              if (data === '[DONE]') continue
               try {
                 const parsed = JSON.parse(data)
                 const delta = parsed.choices?.[0]?.delta?.content || ''
@@ -120,14 +101,26 @@ export async function POST(req: NextRequest) {
                   fullReply += delta
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
                 }
-              } catch {}
+              } catch {
+                // 跳过无法解析的行
+              }
             }
           }
-        } else {
-          // 非流式响应（降级处理）
-          const reply = (completion as any).choices?.[0]?.message?.content || ''
-          fullReply = reply
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: reply })}\n\n`))
+        }
+
+        // 处理剩余 buffer
+        if (buffer.startsWith('data: ')) {
+          const data = buffer.slice(6).trim()
+          if (data && data !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(data)
+              const delta = parsed.choices?.[0]?.delta?.content || ''
+              if (delta) {
+                fullReply += delta
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+              }
+            } catch {}
+          }
         }
 
         // 计算消耗 + 保存记录
