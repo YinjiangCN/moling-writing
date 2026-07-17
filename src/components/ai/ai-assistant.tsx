@@ -123,6 +123,20 @@ export function AiAssistant({ novelId, chapterId, onInsertText }: Props) {
       const decoder = new TextDecoder()
       let buffer = ''
       let fullContent = ''
+      let lastUpdateTime = 0
+      const UPDATE_INTERVAL = 50 // 50ms 节流，避免高频 setMessages 导致 UI 卡顿
+
+      const updateUI = (force = false) => {
+        const now = Date.now()
+        if (force || now - lastUpdateTime >= UPDATE_INTERVAL) {
+          lastUpdateTime = now
+          setMessages((prev) => {
+            const copy = [...prev]
+            copy[copy.length - 1] = { role: 'assistant', content: fullContent, preset }
+            return copy
+          })
+        }
+      }
 
       while (true) {
         const { done, value } = await reader.read()
@@ -141,12 +155,7 @@ export function AiAssistant({ novelId, chapterId, onInsertText }: Props) {
               const parsed = JSON.parse(data)
               if (parsed.delta) {
                 fullContent += parsed.delta
-                // 更新最后一条消息
-                setMessages((prev) => {
-                  const copy = [...prev]
-                  copy[copy.length - 1] = { role: 'assistant', content: fullContent, preset }
-                  return copy
-                })
+                updateUI()
               }
               if (parsed.error) {
                 setMessages((prev) => {
@@ -159,6 +168,9 @@ export function AiAssistant({ novelId, chapterId, onInsertText }: Props) {
           }
         }
       }
+
+      // 最终强制更新一次，确保完整内容显示
+      updateUI(true)
     } catch (e: any) {
       setMessages((prev) => {
         const copy = [...prev]
@@ -288,7 +300,10 @@ export function AiAssistant({ novelId, chapterId, onInsertText }: Props) {
           </div>
         )}
 
-        {messages.map((m, i) => (
+        {messages.map((m, i) => {
+          // 流式过程中跳过空 assistant 消息（由 loading 动画占位）
+          if (m.role === 'assistant' && !m.content && loading) return null
+          return (
           <div
             key={i}
             className={`flex gap-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}
@@ -338,16 +353,17 @@ export function AiAssistant({ novelId, chapterId, onInsertText }: Props) {
               )}
             </div>
           </div>
-        ))}
+          )
+        })}
 
-        {loading && (
+        {loading && !messages.some((m) => m.role === 'assistant' && m.content) && (
           <div className="flex gap-2">
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500/20 to-pink-500/20 flex items-center justify-center">
               <Bot className="w-3.5 h-3.5 text-violet-600" />
             </div>
             <div className="bg-muted rounded-lg px-3 py-2 flex items-center gap-1.5">
               <Loader2 className="w-3 h-3 animate-spin" />
-              <span className="text-sm text-muted-foreground">思考中...</span>
+              <span className="text-sm text-muted-foreground">思考中</span>
               <span className="flex gap-0.5">
                 <span className="w-1 h-1 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-1 h-1 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
