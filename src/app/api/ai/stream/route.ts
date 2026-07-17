@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireSessionOr401 } from '@/lib/auth'
 import { PRESETS } from '../route'
+import { callThirdPartyAI } from '@/lib/ai-providers'
 import ZAI from 'z-ai-web-dev-sdk'
 
 // POST /api/ai/stream - 流式 AI 调用（SSE）
@@ -58,16 +59,15 @@ export async function POST(req: NextRequest) {
     userPrompt = `${editPrompt[preset] || '请处理以下文本：'}\n\n${message || ''}`
   }
 
-  // 调用 AI（流式）
-  const zai = await ZAI.create()
-  const completion: any = await zai.chat.completions.create({
-    messages: [
-      { role: 'system', content: systemPrompt + (extraContext ? `\n\n以下是创作上下文：${extraContext}` : '') },
-      { role: 'user', content: userPrompt || '请帮我继续创作。' },
-    ],
-    thinking: { type: 'disabled' },
-    stream: true,
-  } as any)
+  // 检查用户是否有默认第三方 API 配置
+  const userAiConfig = await db.userAiConfig.findFirst({
+    where: { userId: user.id, enabled: true, isDefault: true },
+  })
+
+  const messages = [
+    { role: 'system', content: systemPrompt + (extraContext ? `\n\n以下是创作上下文：${extraContext}` : '') },
+    { role: 'user', content: userPrompt || '请帮我继续创作。' },
+  ]
 
   // 创建 SSE 流
   const encoder = new TextEncoder()
@@ -76,50 +76,89 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // SDK stream=true 返回 ReadableStream
-        const reader = (completion as ReadableStream<Uint8Array>).getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
+        if (userAiConfig) {
+          // 使用第三方 API（流式）
+          const result = await callThirdPartyAI(
+            { baseUrl: userAiConfig.baseUrl, apiKey: userAiConfig.apiKey, model: userAiConfig.model },
+            messages,
+            { stream: true }
+          )
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
+          if (!result.ok) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: result.error })}\n\n`))
+            controller.close()
+            return
+          }
 
-          // 按行处理 SSE
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
+          if (result.stream) {
+            // 第三方流式响应（OpenAI 兼容 SSE 格式）
+            const reader = result.stream.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim()
-              if (data === '[DONE]') continue
-              try {
-                const parsed = JSON.parse(data)
-                const delta = parsed.choices?.[0]?.delta?.content || ''
-                if (delta) {
-                  fullReply += delta
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              buffer += decoder.decode(value, { stream: true })
+
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ''
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6).trim()
+                  if (data === '[DONE]') continue
+                  try {
+                    const parsed = JSON.parse(data)
+                    const delta = parsed.choices?.[0]?.delta?.content || ''
+                    if (delta) {
+                      fullReply += delta
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+                    }
+                  } catch {}
                 }
-              } catch {
-                // 跳过无法解析的行
               }
             }
+          } else {
+            // 非流式降级
+            fullReply = result.reply || ''
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: fullReply })}\n\n`))
           }
-        }
+        } else {
+          // 使用平台内置 AI（流式）
+          const zai = await ZAI.create()
+          const completion: any = await zai.chat.completions.create({
+            messages,
+            thinking: { type: 'disabled' },
+            stream: true,
+          } as any)
 
-        // 处理剩余 buffer
-        if (buffer.startsWith('data: ')) {
-          const data = buffer.slice(6).trim()
-          if (data && data !== '[DONE]') {
-            try {
-              const parsed = JSON.parse(data)
-              const delta = parsed.choices?.[0]?.delta?.content || ''
-              if (delta) {
-                fullReply += delta
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+          const reader = (completion as ReadableStream<Uint8Array>).getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6).trim()
+                if (data === '[DONE]') continue
+                try {
+                  const parsed = JSON.parse(data)
+                  const delta = parsed.choices?.[0]?.delta?.content || ''
+                  if (delta) {
+                    fullReply += delta
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+                  }
+                } catch {}
               }
-            } catch {}
+            }
           }
         }
 

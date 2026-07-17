@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireSessionOr401 } from '@/lib/auth'
+import { callThirdPartyAI } from '@/lib/ai-providers'
 import ZAI from 'z-ai-web-dev-sdk'
 
 // 预设指令库
@@ -222,17 +223,40 @@ export async function POST(req: NextRequest) {
       userPrompt = `${editPrompt[preset] || '请处理以下文本：'}\n\n${message || ''}`
     }
 
-    // 调用 AI
-    const zai = await ZAI.create()
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt + (extraContext ? `\n\n以下是创作上下文：${extraContext}` : '') },
-        { role: 'user', content: userPrompt || '请帮我继续创作。' },
-      ],
-      thinking: { type: 'disabled' },
+    // 检查用户是否有默认第三方 API 配置
+    const userAiConfig = await db.userAiConfig.findFirst({
+      where: { userId: user.id, enabled: true, isDefault: true },
     })
 
-    const reply = completion.choices[0]?.message?.content || '（无回复）'
+    const messages = [
+      { role: 'system', content: systemPrompt + (extraContext ? `\n\n以下是创作上下文：${extraContext}` : '') },
+      { role: 'user', content: userPrompt || '请帮我继续创作。' },
+    ]
+
+    let reply = ''
+
+    if (userAiConfig) {
+      // 使用用户配置的第三方 API
+      const result = await callThirdPartyAI(
+        { baseUrl: userAiConfig.baseUrl, apiKey: userAiConfig.apiKey, model: userAiConfig.model },
+        messages
+      )
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: `第三方 API 调用失败：${result.error}`, reply: `AI 调用失败：${result.error}` },
+          { status: 500 }
+        )
+      }
+      reply = result.reply || '（无回复）'
+    } else {
+      // 使用平台内置 AI
+      const zai = await ZAI.create()
+      const completion = await zai.chat.completions.create({
+        messages,
+        thinking: { type: 'disabled' },
+      })
+      reply = completion.choices[0]?.message?.content || '（无回复）'
+    }
 
     // 估算 token 消耗
     const tokensUsed = Math.ceil((userPrompt.length + reply.length) / 3)

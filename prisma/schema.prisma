@@ -37,6 +37,34 @@ model User {
   likes        PublicationLike[]
   collects     PublicationCollect[]
   readRecords  ReadRecord[]
+  aiConfigs    UserAiConfig[]
+}
+
+// 用户第三方 AI API 配置
+model UserAiConfig {
+  id        String   @id @default(cuid())
+  userId    String
+  // 提供商
+  provider  String   // deepseek / openai / claude / gemini / grok / minimax / custom
+  name      String   // 显示名（如"我的 DeepSeek"）
+  // API 配置
+  apiKey    String
+  baseUrl   String   // API 基础地址
+  model     String   // 模型名（如 deepseek-chat, gpt-4o, claude-3-sonnet）
+  // 状态
+  enabled   Boolean  @default(true)
+  isDefault Boolean  @default(false) // 是否为默认使用的 API
+  // 测试状态
+  lastTestAt   DateTime?
+  lastTestOk   Boolean  @default(false)
+  lastTestErr  String?
+  // 元数据
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // 充值订单
