@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { requireSessionOr401 } from '@/lib/auth'
 import { PRESETS } from '../route'
 import { callThirdPartyAI } from '@/lib/ai-providers'
+import { getPlatformDefaultAI } from '@/lib/platform-ai'
 import ZAI from 'z-ai-web-dev-sdk'
 
 // POST /api/ai/stream - 流式 AI 调用（SSE）
@@ -125,38 +126,79 @@ export async function POST(req: NextRequest) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: fullReply })}\n\n`))
           }
         } else {
-          // 使用平台内置 AI（流式）
-          const zai = await ZAI.create()
-          const completion: any = await zai.chat.completions.create({
-            messages,
-            thinking: { type: 'disabled' },
-            stream: true,
-          } as any)
-
-          const reader = (completion as ReadableStream<Uint8Array>).getReader()
-          const decoder = new TextDecoder()
-          let buffer = ''
-
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buffer += decoder.decode(value, { stream: true })
-
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim()
-                if (data === '[DONE]') continue
-                try {
-                  const parsed = JSON.parse(data)
-                  const delta = parsed.choices?.[0]?.delta?.content || ''
-                  if (delta) {
-                    fullReply += delta
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+          // 优先级 2：检查平台默认 AI
+          const platformAI = await getPlatformDefaultAI()
+          if (platformAI) {
+            // 使用平台默认 AI（流式）
+            const result = await callThirdPartyAI(platformAI, messages, { stream: true })
+            if (!result.ok) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: result.error })}\n\n`))
+              controller.close()
+              return
+            }
+            if (result.stream) {
+              const reader = result.stream.getReader()
+              const decoder = new TextDecoder()
+              let buffer = ''
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                buffer += decoder.decode(value, { stream: true })
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || ''
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    const data = line.slice(6).trim()
+                    if (data === '[DONE]') continue
+                    try {
+                      const parsed = JSON.parse(data)
+                      const delta = parsed.choices?.[0]?.delta?.content || ''
+                      if (delta) {
+                        fullReply += delta
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+                      }
+                    } catch {}
                   }
-                } catch {}
+                }
+              }
+            } else {
+              fullReply = result.reply || ''
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: fullReply })}\n\n`))
+            }
+          } else {
+            // 优先级 3：使用内置 z-ai（流式）
+            const zai = await ZAI.create()
+            const completion: any = await zai.chat.completions.create({
+              messages,
+              thinking: { type: 'disabled' },
+              stream: true,
+            } as any)
+
+            const reader = (completion as ReadableStream<Uint8Array>).getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              buffer += decoder.decode(value, { stream: true })
+
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ''
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6).trim()
+                  if (data === '[DONE]') continue
+                  try {
+                    const parsed = JSON.parse(data)
+                    const delta = parsed.choices?.[0]?.delta?.content || ''
+                    if (delta) {
+                      fullReply += delta
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+                    }
+                  } catch {}
+                }
               }
             }
           }

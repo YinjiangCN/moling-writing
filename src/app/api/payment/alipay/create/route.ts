@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireSessionOr401 } from '@/lib/auth'
 import { createAlipayClient, isPaymentAvailable } from '@/lib/payment'
-import { PACKAGES } from '@/app/api/orders/route'
+import { getPackages } from '@/app/api/orders/route'
 
 // POST /api/payment/alipay/create - 创建支付宝订单
 export async function POST(req: NextRequest) {
@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { packageId } = body
 
-  const pkg = PACKAGES.find((p) => p.id === packageId)
+  const packages = await getPackages()
+  const pkg = packages.find((p) => p.id === packageId)
   if (!pkg) return NextResponse.json({ error: '套餐不存在' }, { status: 400 })
 
   // 创建订单

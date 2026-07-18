@@ -9,6 +9,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 平台全局配置（单条记录，id 固定为 "default"）
+model PlatformConfig {
+  id              String   @id @default("default")
+  // 平台基础
+  platformName    String   @default("墨灵写作")
+  platformIcon    String   @default("") // URL 或空
+  platformDesc    String   @default("AI 驱动的网文创作平台")
+  // 平台模式
+  mode            String   @default("paid") // paid(付费) / free(免费)
+  // 充值配置
+  rechargeEnabled Boolean  @default(true)
+  // 自定义套餐 JSON: [{"id":"starter","tokens":50000,"price":9.9,"name":"入门","popular":false}]
+  customPackages  String   @default("")
+  // 默认 AI 配置
+  defaultAiProvider String @default("") // deepseek/openai/claude/gemini/grok/minimax
+  defaultAiApiKey  String   @default("")
+  defaultAiBaseUrl String   @default("")
+  defaultAiModel   String   @default("")
+  // 注册赠送
+  registerTokens  Int      @default(10000)
+  // 时间
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 // ============ 用户与计费 ============
 model User {
   id           String   @id @default(cuid())

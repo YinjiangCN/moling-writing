@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireSessionOr401 } from '@/lib/auth'
 import { callThirdPartyAI } from '@/lib/ai-providers'
+import { getPlatformDefaultAI } from '@/lib/platform-ai'
 import ZAI from 'z-ai-web-dev-sdk'
 
 // 预设指令库
@@ -236,7 +237,7 @@ export async function POST(req: NextRequest) {
     let reply = ''
 
     if (userAiConfig) {
-      // 使用用户配置的第三方 API
+      // 优先级 1：使用用户配置的第三方 API（不消耗平台 Token）
       const result = await callThirdPartyAI(
         { baseUrl: userAiConfig.baseUrl, apiKey: userAiConfig.apiKey, model: userAiConfig.model },
         messages
@@ -248,14 +249,29 @@ export async function POST(req: NextRequest) {
         )
       }
       reply = result.reply || '（无回复）'
+      // 用户自定义 API 不消耗平台 Token
     } else {
-      // 使用平台内置 AI
-      const zai = await ZAI.create()
-      const completion = await zai.chat.completions.create({
-        messages,
-        thinking: { type: 'disabled' },
-      })
-      reply = completion.choices[0]?.message?.content || '（无回复）'
+      // 检查平台是否配置了默认 AI
+      const platformAI = await getPlatformDefaultAI()
+      if (platformAI) {
+        // 优先级 2：使用平台默认 AI（消耗用户 Token）
+        const result = await callThirdPartyAI(platformAI, messages)
+        if (!result.ok) {
+          return NextResponse.json(
+            { error: `平台 AI 调用失败：${result.error}`, reply: `AI 调用失败：${result.error}` },
+            { status: 500 }
+          )
+        }
+        reply = result.reply || '（无回复）'
+      } else {
+        // 优先级 3：使用内置 z-ai（消耗用户 Token）
+        const zai = await ZAI.create()
+        const completion = await zai.chat.completions.create({
+          messages,
+          thinking: { type: 'disabled' },
+        })
+        reply = completion.choices[0]?.message?.content || '（无回复）'
+      }
     }
 
     // 估算 token 消耗
