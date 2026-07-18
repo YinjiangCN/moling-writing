@@ -38,6 +38,9 @@ interface AppState {
   aiPanelOpen: boolean
   presetOpen: boolean
 
+  // 强制修改密码
+  forceChangePassword: boolean
+
   // Actions
   setUser: (u: UserPublic | null) => void
   setAuthLoading: (b: boolean) => void
@@ -51,6 +54,7 @@ interface AppState {
   toggleRightPanel: () => void
   toggleAiPanel: () => void
   setPresetOpen: (v: boolean) => void
+  setForceChangePassword: (v: boolean) => void
   backToWorkspace: () => void
 }
 
@@ -70,6 +74,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   aiPanelOpen: true,
   presetOpen: false,
+  forceChangePassword: false,
 
   setUser: (u) => set({ user: u }),
   setAuthLoading: (b) => set({ authLoading: b }),
@@ -84,6 +89,7 @@ export const useAppStore = create<AppState>((set) => ({
   toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen })),
   toggleAiPanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
   setPresetOpen: (v) => set({ presetOpen: v }),
+  setForceChangePassword: (v) => set({ forceChangePassword: v }),
   backToWorkspace: () =>
     set({ view: 'workspace', currentNovelId: null, currentChapterId: null }),
 }))

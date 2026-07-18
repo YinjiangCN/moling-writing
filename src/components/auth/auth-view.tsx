@@ -25,7 +25,7 @@ interface UserPublic {
 }
 
 export function AuthView() {
-  const { setUser, setView } = useAppStore()
+  const { setUser, setView, setForceChangePassword } = useAppStore()
   const [tab, setTab] = useState<'login' | 'register'>('login')
 
   // 登录
@@ -81,11 +81,15 @@ export function AuthView() {
     }
     setLoginLoading(true)
     try {
-      const r = await api<{ user: UserPublic }>('/api/auth/login', {
+      const r = await api<{ user: UserPublic; needChangePassword?: boolean }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       })
       setUser(r.user)
+      if (r.needChangePassword) {
+        toast.warning('检测到默认密码，请立即修改账号信息')
+        setForceChangePassword(true)
+      }
       toast.success(`欢迎回来，${r.user.penName || r.user.name || r.user.email}！`)
       setView(r.user.role === 'admin' ? 'admin' : 'workspace')
     } catch (e: any) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { verifyPassword, signToken, COOKIE_NAME, COOKIE_MAX_AGE, userPublic, ensureAdminUser } from '@/lib/auth'
+import { verifyPassword, signToken, COOKIE_NAME, COOKIE_MAX_AGE, userPublic, ensureAdminUser, hashPassword } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,8 +20,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '账号已被封禁，请联系管理员' }, { status: 403 })
     }
 
+    // 检测是否使用默认密码（admin123）
+    const isDefaultPassword = user.email === 'admin@moli.com' && verifyPassword('admin123', user.password)
+
     const token = signToken(user.id)
-    const res = NextResponse.json({ user: userPublic(user) })
+    const res = NextResponse.json({
+      user: userPublic(user),
+      needChangePassword: isDefaultPassword,
+    })
     res.cookies.set(COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: 'lax',

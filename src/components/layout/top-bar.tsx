@@ -32,7 +32,7 @@ interface UserPublic {
 }
 
 export function TopBar() {
-  const { user, setUser, authLoading, view, setView, backToWorkspace } = useAppStore()
+  const { user, setUser, authLoading, view, setView, backToWorkspace, setForceChangePassword } = useAppStore()
   const [tokens, setTokens] = useState<number | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [messagesOpen, setMessagesOpen] = useState(false)
@@ -54,10 +54,15 @@ export function TopBar() {
     let mounted = true
     const load = async () => {
       try {
-        const r = await api<{ user: UserPublic | null }>('/api/auth/me')
+        const r = await api<{ user: UserPublic | null; needChangePassword?: boolean }>('/api/auth/me')
         if (mounted) {
           setUser(r.user)
-          if (r.user) setTokens(r.user.tokens)
+          if (r.user) {
+            setTokens(r.user.tokens)
+            if (r.needChangePassword) {
+              setForceChangePassword(true)
+            }
+          }
         }
       } catch {
         // ignore

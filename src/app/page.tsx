@@ -11,9 +11,10 @@ import { AuthView } from '@/components/auth/auth-view'
 import { AdminView } from '@/components/admin/admin-view'
 import { AutoSerialPanel } from '@/components/editor/auto-serial-panel'
 import { PlazaView } from '@/components/plaza/plaza-view'
+import { ForceChangePasswordDialog } from '@/components/auth/force-change-password'
 
 export default function Home() {
-  const { view, theme, currentNovelId, user, authLoading } = useAppStore()
+  const { view, theme, currentNovelId, user, authLoading, forceChangePassword } = useAppStore()
   const [mounted] = useState(true)
 
   useEffect(() => {
@@ -67,6 +68,12 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* 强制修改密码弹窗 */}
+      <ForceChangePasswordDialog
+        open={forceChangePassword}
+        onClose={() => {}}
+      />
     </div>
   )
 }
