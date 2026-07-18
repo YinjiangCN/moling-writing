@@ -69,3 +69,10 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+# 项目内部文件（不需要开源）
+/.zscripts/
+/Caddyfile
+/examples/
+/tool-results/
+/worklog.md
+/social-preview.svg
