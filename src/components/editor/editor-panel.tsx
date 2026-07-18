@@ -22,11 +22,13 @@ import {
   Loader2,
   FileText,
   Eye,
+  Type,
 } from 'lucide-react'
 import { api, CHAPTER_STATUS } from '@/lib/helpers'
 import type { Chapter, NovelDetail } from './editor-view'
 import { toast } from 'sonner'
 import { MentionOverlay } from './mention-overlay'
+import { RichTextEditor } from './rich-text-editor'
 import {
   Popover,
   PopoverContent,
@@ -59,6 +61,7 @@ export function EditorPanel({
   const [inlineMenuOpen, setInlineMenuOpen] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [genChapterOpen, setGenChapterOpen] = useState(false)
+  const [useRichText, setUseRichText] = useState(false)
   const [coreEvent, setCoreEvent] = useState('')
 
   // 监听选中
@@ -275,6 +278,17 @@ export function EditorPanel({
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertMarkdown('- ')}>
           <List className="w-3.5 h-3.5" />
         </Button>
+        {/* 纯文本/富文本切换 */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-7 text-xs gap-1 ml-1 ${useRichText ? 'bg-secondary' : ''}`}
+          onClick={() => setUseRichText(!useRichText)}
+          title={useRichText ? '切换到纯文本模式' : '切换到富文本模式'}
+        >
+          <Type className="w-3.5 h-3.5" />
+          {useRichText ? '纯文本' : '富文本'}
+        </Button>
         <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
           {aiLoading ? (
             <span className="text-violet-500 flex items-center gap-1">
@@ -296,40 +310,51 @@ export function EditorPanel({
 
       {/* 编辑区 */}
       <div className="flex-1 overflow-hidden relative">
-        <textarea
-          ref={textareaRef}
-          value={chapter.content}
-          onChange={(e) => onContentChange(e.target.value)}
-          onSelect={handleSelect}
-          onScroll={handleScroll}
-          onClick={handleSelect}
-          onKeyUp={handleSelect}
-          onKeyDown={(e) => {
-            // 快捷键：Ctrl+B 粗体, Ctrl+I 斜体, Ctrl+S 保存（防默认）
-            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-              e.preventDefault()
-              insertMarkdown('**', '**')
-            } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
-              e.preventDefault()
-              insertMarkdown('*', '*')
-            } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-              e.preventDefault()
-              // 自动保存已在 editor-view 中防抖处理，这里只提示
-              toast.success('已保存')
-            }
-          }}
-          placeholder="开始你的创作... 选中文字可触发 AI 润色/扩写/缩写菜单（Ctrl+B 粗体 / Ctrl+I 斜体 / 输入 @ 引用设定）"
-          className={`w-full h-full resize-none bg-background px-12 py-8 outline-none text-base leading-7 ${
-            editorMode === 'focus'
-              ? 'focus-within:[&::-webkit-scrollbar]:w-0'
-              : ''
-          } ${editorMode === 'typewriter' ? 'typewriter-mode' : ''}`}
-          style={{
-            fontFamily: '"Noto Serif SC", "Source Han Serif", Georgia, serif',
-            fontSize: '16px',
-            lineHeight: '28px',
-          }}
-        />
+        {useRichText ? (
+          /* 富文本编辑器模式 */
+          <RichTextEditor
+            value={chapter.content}
+            onChange={onContentChange}
+            placeholder="开始你的创作...（富文本模式，支持工具栏排版）"
+            editorMode={editorMode}
+            onSelectionChange={(text) => {
+              setSelectedText(text)
+              setInlineMenuOpen(!!text)
+            }}
+          />
+        ) : (
+          /* 纯文本编辑器模式（原有） */
+          <textarea
+            ref={textareaRef}
+            value={chapter.content}
+            onChange={(e) => onContentChange(e.target.value)}
+            onSelect={handleSelect}
+            onScroll={handleScroll}
+            onClick={handleSelect}
+            onKeyUp={handleSelect}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault()
+                insertMarkdown('**', '**')
+              } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+                e.preventDefault()
+                insertMarkdown('*', '*')
+              } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault()
+                toast.success('已保存')
+              }
+            }}
+            placeholder="开始你的创作... 选中文字可触发 AI 润色/扩写/缩写菜单（Ctrl+B 粗体 / Ctrl+I 斜体 / 输入 @ 引用设定）"
+            className={`w-full h-full resize-none bg-background px-12 py-8 outline-none text-base leading-7 ${
+              editorMode === 'focus' ? 'focus-within:[&::-webkit-scrollbar]:w-0' : ''
+            } ${editorMode === 'typewriter' ? 'typewriter-mode' : ''}`}
+            style={{
+              fontFamily: '"Noto Serif SC", "Source Han Serif", Georgia, serif',
+              fontSize: '16px',
+              lineHeight: '28px',
+            }}
+          />
+        )}
 
         {/* @ 设定引用 */}
         {chapter && (

@@ -179,3 +179,143 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ============ 富文本编辑器样式 ============ */
+
+/* mdxeditor 暗色模式 */
+.dark .dark-theme {
+  --mdxeditor-background: oklch(0.145 0 0);
+  --mdxeditor-color: oklch(0.985 0 0);
+}
+
+/* 编辑器主体 */
+.rich-text-editor .mdxeditor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: none !important;
+  background: transparent !important;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] {
+  outline: none;
+  padding: 2rem 3rem;
+  font-family: "Noto Serif SC", "Source Han Serif", Georgia, serif;
+  font-size: 16px;
+  line-height: 1.8;
+  min-height: 100%;
+}
+
+.rich-text-editor .mdxeditor [contenteditable]:focus {
+  outline: none;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] p {
+  margin-bottom: 1em;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] h2 {
+  font-size: 1.3em;
+  font-weight: 700;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.3em;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] blockquote {
+  border-left: 3px solid oklch(0.7 0 0 / 0.3);
+  padding-left: 1rem;
+  margin: 1em 0;
+  color: oklch(0.5 0 0);
+}
+
+.rich-text-editor .mdxeditor [contenteditable] ul,
+.rich-text-editor .mdxeditor [contenteditable] ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1em;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] code {
+  background: oklch(0.9 0 0 / 0.3);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] a {
+  color: oklch(0.6 0.2 250);
+  text-decoration: underline;
+}
+
+.rich-text-editor .mdxeditor [contenteditable] hr {
+  border: none;
+  border-top: 1px solid oklch(0.8 0 0 / 0.3);
+  margin: 2em 0;
+}
+
+/* 工具栏 */
+.rich-text-editor .mdxeditor [role="toolbar"] {
+  border-bottom: 1px solid oklch(0.9 0 0 / 0.2);
+  background: oklch(0.97 0 0 / 0.5);
+  padding: 0.25rem 0.5rem;
+  gap: 0.125rem;
+  flex-wrap: wrap;
+}
+
+.dark .rich-text-editor .mdxeditor [role="toolbar"] {
+  background: oklch(0.2 0 0 / 0.5);
+}
+
+.rich-text-editor .mdxeditor [role="toolbar"] button {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.rich-text-editor .mdxeditor [role="toolbar"] button:hover {
+  background: oklch(0.9 0 0 / 0.3);
+}
+
+.dark .rich-text-editor .mdxeditor [role="toolbar"] button:hover {
+  background: oklch(0.3 0 0 / 0.5);
+}
+
+/* 打字机模式 */
+.typewriter-mode .mdxeditor [contenteditable] {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* 专注模式 */
+.focus-mode .mdxeditor [contenteditable] {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.focus-mode .mdxeditor [contenteditable] p {
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.focus-mode .mdxeditor [contenteditable] p:focus-within {
+  opacity: 1;
+}
+
+/* 护眼模式 */
+.theme-eye .rich-text-editor .mdxeditor [contenteditable] {
+  background: transparent;
+  color: oklch(0.25 0.02 130);
+}
