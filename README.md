@@ -10,6 +10,20 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-6-indigo)](https://www.prisma.io/)
+[![Bun](https://img.shields.io/badge/Bun-1-f472b6)](https://bun.sh/)
+
+## 📊 项目规模
+
+| 指标 | 数量 |
+|------|------|
+| 代码行数 | 22,700+ 行 |
+| TypeScript 文件 | 127 个 |
+| API 路由 | 47 个 |
+| 数据库模型 | 28 个 |
+| AI 预设指令 | 18 个 |
+| 管理后台 Tab | 10 个 |
+| 支持 AI 提供商 | 6 家 |
+| README 语言 | 10 种 |
 
 ## ✨ 核心功能
 
@@ -22,6 +36,7 @@
 - **导出** — TXT / Markdown / 全书 ZIP（按卷分文件夹）
 - **字数目标** — 进度条 + 达成提醒
 - **回收站** — 软删除 + 30 天恢复
+- **快捷键** — Ctrl+B 粗体 / Ctrl+I 斜体 / Ctrl+S 保存
 
 ### 🤖 AI 创作助手
 - **18 个预设指令** — 建书 / 正文 / 辅助 / 类型 / 编辑 / 设定 6 大类
@@ -71,11 +86,57 @@
 | 后端服务 | Bun 进程（auto-serial mini-service）|
 | 状态管理 | Zustand + TanStack Query |
 
+## 📁 项目结构
+
+```
+moling-writing/
+├── prisma/
+│   └── schema.prisma              # 28 个数据库模型
+├── src/
+│   ├── app/
+│   │   ├── api/                   # 47 个 API 路由
+│   │   │   ├── auth/              # 认证（登录/注册/验证码）
+│   │   │   ├── novels/            # 小说 CRUD + 回收站
+│   │   │   ├── chapters/          # 章节 + 版本历史
+│   │   │   ├── ai/                # AI 调用（普通+流式）
+│   │   │   ├── plaza/             # 作品广场
+│   │   │   ├── payment/           # 支付宝支付
+│   │   │   ├── admin/             # 管理员后台 API
+│   │   │   └── ...
+│   │   ├── page.tsx               # 主页面
+│   │   └── layout.tsx             # 布局
+│   ├── components/
+│   │   ├── editor/                # 编辑器（三栏/章节树/工具栏）
+│   │   ├── workspace/             # 工作台
+│   │   ├── ai/                    # AI 助手
+│   │   ├── admin/                 # 管理后台（10 Tab）
+│   │   ├── plaza/                 # 作品广场
+│   │   ├── user/                  # 用户中心
+│   │   ├── auth/                  # 登录注册
+│   │   └── settings/              # 设定库
+│   └── lib/
+│       ├── auth.ts                # JWT + scrypt 鉴权
+│       ├── ai-providers.ts        # 6 家 AI 提供商配置
+│       ├── payment.ts             # 支付宝配置
+│       ├── email.ts               # 邮件系统
+│       ├── redeem.ts              # 兑换码
+│       └── store.ts               # Zustand 状态
+├── mini-services/
+│   └── auto-serial/               # 自动连载独立服务
+├── .github/
+│   ├── ISSUE_TEMPLATE/            # Issue 模板
+│   └── workflows/ci.yml           # GitHub Actions CI
+├── .env.example                   # 环境变量模板
+├── LICENSE                        # MIT 协议
+├── CONTRIBUTING.md                # 贡献指南
+└── README.md                      # 你正在看的这个
+```
+
 ## 🚀 快速开始
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/your-username/moling-writing.git
+git clone https://github.com/YinjiangCN/moling-writing.git
 cd moling-writing
 
 # 2. 安装依赖
@@ -103,9 +164,35 @@ cd mini-services/auto-serial && bun run dev
 
 管理员后台内置完整平台文档（12 个章节），登录后进入「管理后台 → 文档」查看。
 
-## 📸 截图
+## 🗺️ 功能路线图
 
-> 截图可在 `download/` 目录找到，部署后可替换为实际 URL
+### ✅ 已完成
+- [x] 三栏沉浸式编辑器 + 4 种模式
+- [x] AI 助手 18 预设 + 流式输出
+- [x] 自动连载 mini-service
+- [x] 设定库 + AI 自动生成
+- [x] 作品广场 + 读者阅读页
+- [x] 支付宝支付接入
+- [x] 兑换码系统
+- [x] 邮件系统
+- [x] 管理员后台 10 Tab
+- [x] 第三方 AI API 接入（6 家）
+- [x] 版本历史 + 回滚
+- [x] 全文搜索
+- [x] 导出（TXT/MD/ZIP）
+- [x] 回收站 + 数据备份
+
+### 🔜 计划中
+- [ ] 内容审核（敏感词过滤）
+- [ ] 微信支付接入
+- [ ] PWA / 移动端适配
+- [ ] 富文本编辑器
+- [ ] 人物关系图谱可视化
+- [ ] 时间线/事件线管理
+- [ ] 伏笔追踪系统
+- [ ] 创作模板库
+- [ ] 多端同步
+- [ ] 2FA 二次验证
 
 ## 🤝 贡献
 
@@ -114,3 +201,5 @@ cd mini-services/auto-serial && bun run dev
 ## 📄 License
 
 [MIT License](./LICENSE) — 自由使用、修改、分发
+
+Copyright © 2026 [YinjiangCN](https://github.com/YinjiangCN)

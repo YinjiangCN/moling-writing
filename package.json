@@ -1,7 +1,15 @@
 {
-  "name": "nextjs_tailwind_shadcn_ts",
-  "version": "0.2.0",
+  "name": "moling-writing",
+  "version": "1.0.0",
   "private": true,
+  "description": "墨灵写作 - AI 驱动的网文创作平台",
+  "author": "YinjiangCN",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YinjiangCN/moling-writing.git"
+  },
+  "homepage": "https://github.com/YinjiangCN/moling-writing",
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",

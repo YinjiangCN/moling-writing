@@ -22,7 +22,7 @@
 ## 🚀 Быстрый старт
 
 ```bash
-git clone https://github.com/your-username/moling-writing.git
+git clone https://github.com/YinjiangCN/moling-writing.git
 cd moling-writing
 bun install
 cp .env.example .env

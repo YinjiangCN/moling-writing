@@ -10,18 +10,33 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-6-indigo)](https://www.prisma.io/)
+[![Bun](https://img.shields.io/badge/Bun-1-f472b6)](https://bun.sh/)
+
+## 📊 Project Scale
+
+| Metric | Count |
+|--------|-------|
+| Lines of Code | 22,700+ |
+| TypeScript Files | 127 |
+| API Routes | 47 |
+| Database Models | 28 |
+| AI Preset Commands | 18 |
+| Admin Tabs | 10 |
+| AI Providers | 6 |
+| README Languages | 10 |
 
 ## ✨ Key Features
 
 ### 📝 Writing Engine
 - **Three-Panel Immersive Editor** — Chapter tree / Edit area / AI assistant, resizable
 - **4 Edit Modes** — Normal / Typewriter / Focus / Dark / Eye-care
-- **Drag & Drop Chapters** — Reorder within volume + move across volumes (dnd-kit)
+- **Drag & Drop Chapters** — Reorder within volume + move across volumes
 - **Version History** — Manual snapshots + rollback (30 per chapter)
 - **Full-text Search** — Cross-chapter search with context preview
 - **Export** — TXT / Markdown / Full-book ZIP (organized by volume folders)
 - **Word Count Goals** — Progress bar + achievement alerts
 - **Recycle Bin** — Soft delete + 30-day recovery
+- **Shortcuts** — Ctrl+B Bold / Ctrl+I Italic / Ctrl+S Save
 
 ### 🤖 AI Writing Assistant
 - **18 Preset Commands** — 6 categories: Book creation / Content / Helpers / Genre / Editing / Settings
@@ -36,7 +51,6 @@
 ### 📚 World-Building Library
 - **Three Card Types** — Characters / Worldview / Items & Skills
 - **AI Auto-Generation** — Single generation + batch generation (3 chars + 2 worldviews + 2 items)
-- **AI Character Backstory** — Keywords → Complete background story
 
 ### 🌐 Publication Plaza
 - **Public Publishing** — Authors can publish novels to the plaza
@@ -75,7 +89,7 @@
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-username/moling-writing.git
+git clone https://github.com/YinjiangCN/moling-writing.git
 cd moling-writing
 
 # 2. Install
@@ -98,6 +112,42 @@ Open `http://localhost:3000`. Admin account is auto-created:
 - Email: `admin@moli.com`
 - Password: `admin123`
 
+## 🗺️ Roadmap
+
+### ✅ Completed
+- [x] Three-panel immersive editor + 4 modes
+- [x] AI assistant with 18 presets + streaming output
+- [x] Auto-serialization mini-service
+- [x] World-building library + AI auto-generation
+- [x] Publication plaza + reader page
+- [x] Alipay payment integration
+- [x] Redemption code system
+- [x] Email system
+- [x] Admin dashboard with 10 tabs
+- [x] Third-party AI API integration (6 providers)
+- [x] Version history + rollback
+- [x] Full-text search
+- [x] Export (TXT/MD/ZIP)
+- [x] Recycle bin + data backup
+
+### 🔜 Planned
+- [ ] Content moderation (sensitive word filtering)
+- [ ] WeChat Pay integration
+- [ ] PWA / Mobile adaptation
+- [ ] Rich text editor
+- [ ] Character relationship graph visualization
+- [ ] Timeline / event line management
+- [ ] Foreshadowing tracking system
+- [ ] Writing template library
+- [ ] Multi-device sync
+- [ ] 2FA authentication
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read the [Contributing Guide](./CONTRIBUTING.md).
+
 ## 📄 License
 
-[MIT License](./LICENSE)
+[MIT License](./LICENSE) — Free to use, modify, and distribute
+
+Copyright © 2026 [YinjiangCN](https://github.com/YinjiangCN)
