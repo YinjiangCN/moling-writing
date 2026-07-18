@@ -8,7 +8,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ user: null })
 
   // 检测是否使用默认密码
-  const isDefaultPassword = user.email === 'admin@moli.com' && verifyPassword('admin123', user.password)
+  const isDefaultPassword = verifyPassword('admin123', user.password)
 
   return NextResponse.json({
     user: userPublic(user),

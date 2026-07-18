@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 检测是否使用默认密码（admin123）
-    const isDefaultPassword = user.email === 'admin@moli.com' && verifyPassword('admin123', user.password)
+    const isDefaultPassword = verifyPassword('admin123', user.password)
 
     const token = signToken(user.id)
     const res = NextResponse.json({

@@ -26,7 +26,7 @@ export function ForceChangePasswordDialog({ open, onClose }: Props) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [newEmail, setNewEmail] = useState(user?.email === 'admin@moli.com' ? '' : (user?.email || ''))
+  const [newEmail, setNewEmail] = useState('')
   const [newName, setNewName] = useState(user?.name || '')
   const [loading, setLoading] = useState(false)
 
@@ -92,10 +92,10 @@ export function ForceChangePasswordDialog({ open, onClose }: Props) {
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg p-3 space-y-1.5">
             <div className="flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-200">
               <Shield className="w-3.5 h-3.5" />
-              检测到您正在使用默认管理员账号
+              检测到您正在使用默认密码
             </div>
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              出于安全考虑，请立即修改账号邮箱和密码。默认密码 <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">admin123</code> 已公开在 README 中，存在安全风险。
+              出于安全考虑，请立即修改密码{isDefaultEmail && '和邮箱'}。默认密码 <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">admin123</code> 已公开在 README 中，存在安全风险。
             </p>
           </div>
 
@@ -111,16 +111,16 @@ export function ForceChangePasswordDialog({ open, onClose }: Props) {
             />
           </div>
 
-          {/* 修改邮箱（可选） */}
+          {/* 修改邮箱 */}
           <div className="space-y-1.5">
             <Label className="text-xs">
-              登录邮箱 {isDefaultEmail && <span className="text-amber-600">（建议修改）</span>}
+              登录邮箱 {isDefaultEmail && <span className="text-amber-600">*（建议修改默认邮箱）</span>}
             </Label>
             <Input
               type="email"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="your@email.com"
+              placeholder={isDefaultEmail ? '请输入新邮箱' : (user?.email || 'your@email.com')}
               className="h-9"
             />
           </div>

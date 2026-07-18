@@ -136,14 +136,16 @@ export function userPublic(user: {
   }
 }
 
-// 预置管理员账号（首次启动时调用）
+// 预置管理员账号（仅在没有管理员时创建一次）
 export async function ensureAdminUser() {
-  const adminEmail = 'admin@moli.com'
-  const existing = await db.user.findUnique({ where: { email: adminEmail } })
-  if (existing) return existing
+  // 检查是否已有任何管理员
+  const adminCount = await db.user.count({ where: { role: 'admin' } })
+  if (adminCount > 0) return null
+
+  // 没有管理员才创建默认管理员
   return db.user.create({
     data: {
-      email: adminEmail,
+      email: 'admin@moli.com',
       password: hashPassword('admin123'),
       name: '平台管理员',
       penName: '管理员',
