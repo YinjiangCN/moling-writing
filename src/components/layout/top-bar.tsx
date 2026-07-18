@@ -35,8 +35,11 @@ interface UserPublic {
 
 export function TopBar() {
   const { user, setUser, authLoading, view, setView, backToWorkspace, setForceChangePassword } = useAppStore()
-  const { t } = useI18n()
+  const { t, hydrate } = useI18n()
   const [tokens, setTokens] = useState<number | null>(null)
+
+  // 客户端 hydrate 语言
+  useEffect(() => { hydrate() }, [hydrate])
   const [unreadCount, setUnreadCount] = useState(0)
   const [messagesOpen, setMessagesOpen] = useState(false)
 
