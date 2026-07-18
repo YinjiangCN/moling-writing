@@ -54,8 +54,9 @@ import {
   Megaphone,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { DocsView } from './docs-view'
 
-type AdminTab = 'overview' | 'users' | 'novels' | 'orders' | 'messages' | 'email' | 'redeem' | 'announcements' | 'broadcast'
+type AdminTab = 'overview' | 'users' | 'novels' | 'orders' | 'messages' | 'email' | 'redeem' | 'announcements' | 'broadcast' | 'docs'
 
 export function AdminView() {
   const [tab, setTab] = useState<AdminTab>('overview')
@@ -111,6 +112,10 @@ export function AdminView() {
               <Ticket className="w-3.5 h-3.5" />
               兑换码
             </TabsTrigger>
+            <TabsTrigger value="docs" className="gap-1.5">
+              <BookOpen className="w-3.5 h-3.5" />
+              文档
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-4">
@@ -139,6 +144,9 @@ export function AdminView() {
           </TabsContent>
           <TabsContent value="redeem" className="mt-4">
             <RedeemCodesTab />
+          </TabsContent>
+          <TabsContent value="docs" className="mt-4">
+            <DocsView />
           </TabsContent>
         </Tabs>
       </div>
