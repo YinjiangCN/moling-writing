@@ -74,7 +74,16 @@ export function UserCenter() {
   const [payDialog, setPayDialog] = useState<{ pkg: any; orderId: string } | null>(null)
   const [payMethod, setPayMethod] = useState('alipay')
   const [paying, setPaying] = useState(false)
+  const [realPayLoading, setRealPayLoading] = useState(false)
   const [section, setSection] = useState<Section>('profile')
+  const [paymentAvailable, setPaymentAvailable] = useState(false)
+
+  // 检查是否配置了真实支付
+  useEffect(() => {
+    api<{ available: boolean }>('/api/payment/status').then((r) => {
+      setPaymentAvailable(r.available)
+    }).catch(() => setPaymentAvailable(false))
+  }, [])
 
   const load = async () => {
     try {
@@ -118,15 +127,33 @@ export function UserCenter() {
   }
 
   const handleRecharge = async (pkg: any) => {
-    try {
-      const r = await api<{ order: any; package: any }>('/api/orders', {
-        method: 'POST',
-        body: JSON.stringify({ packageId: pkg.id, method: payMethod }),
-      })
-      setPayDialog({ pkg: r.package, orderId: r.order.id })
-      toast.info('订单已创建，请在弹窗中完成支付')
-    } catch (e: any) {
-      toast.error(e.message)
+    if (paymentAvailable) {
+      // 真实支付流程
+      setRealPayLoading(true)
+      try {
+        const r = await api<{ payUrl: string; orderId: string }>('/api/payment/alipay/create', {
+          method: 'POST',
+          body: JSON.stringify({ packageId: pkg.id }),
+        })
+        // 跳转到支付宝支付页面
+        window.location.href = r.payUrl
+      } catch (e: any) {
+        toast.error(e.message)
+      } finally {
+        setRealPayLoading(false)
+      }
+    } else {
+      // 模拟支付流程
+      try {
+        const r = await api<{ order: any; package: any }>('/api/orders', {
+          method: 'POST',
+          body: JSON.stringify({ packageId: pkg.id, method: payMethod }),
+        })
+        setPayDialog({ pkg: r.package, orderId: r.order.id })
+        toast.info('订单已创建，请在弹窗中完成支付')
+      } catch (e: any) {
+        toast.error(e.message)
+      }
     }
   }
 
@@ -288,6 +315,8 @@ export function UserCenter() {
                 currentPlan={data.user.plan}
                 onRecharge={handleRecharge}
                 onUpgrade={handleUpgrade}
+                paymentAvailable={paymentAvailable}
+                realPayLoading={realPayLoading}
               />
             )}
             {section === 'redeem' && <RedeemCard onRedeemed={load} />}
@@ -494,11 +523,15 @@ function RechargeSection({
   currentPlan,
   onRecharge,
   onUpgrade,
+  paymentAvailable,
+  realPayLoading,
 }: {
   packages: any[]
   currentPlan: string
   onRecharge: (pkg: any) => void
   onUpgrade: (plan: string) => void
+  paymentAvailable: boolean
+  realPayLoading: boolean
 }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -536,15 +569,18 @@ function RechargeSection({
                 </div>
                 <div className="text-right">
                   <div className="font-bold text-lg">¥{p.price}</div>
-                  <Button size="sm" variant="outline" onClick={() => onRecharge(p)}>
-                    购买
+                  <Button size="sm" variant="outline" onClick={() => onRecharge(p)} disabled={realPayLoading}>
+                    {realPayLoading ? '跳转中...' : '购买'}
                   </Button>
                 </div>
               </div>
             ))
           )}
           <p className="text-xs text-muted-foreground text-center pt-2">
-            演示版：点击购买后弹出模拟支付窗，无需真实扣款
+            {paymentAvailable
+              ? '🔒 支付宝安全支付，支付后 Token 自动到账'
+              : '演示模式：点击购买后弹出模拟支付窗，无需真实扣款'
+            }
           </p>
         </CardContent>
       </Card>
