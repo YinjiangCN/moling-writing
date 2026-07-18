@@ -48,46 +48,31 @@ interface AiConfig {
   createdAt: string
 }
 
-// 提供商配色方案 + logo
-const PROVIDER_STYLES: Record<string, { logo: string; gradient: string; bg: string; border: string; text: string }> = {
-  deepseek: { logo: 'https://sfile.chatglm.cn/images-ppt/1c38c8be0681.jpg', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/10', border: 'border-blue-200 dark:border-blue-800', text: 'text-blue-600' },
-  openai: { logo: 'https://sfile.chatglm.cn/images-ppt/d26cbaef8fb3.png', gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-800', text: 'text-emerald-600' },
-  claude: { logo: 'https://sfile.chatglm.cn/images-ppt/e716137b2c7e.jpg', gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-500/10', border: 'border-orange-200 dark:border-orange-800', text: 'text-orange-600' },
-  gemini: { logo: 'https://sfile.chatglm.cn/images-ppt/9e2140b236e2.png', gradient: 'from-violet-500 to-purple-500', bg: 'bg-violet-500/10', border: 'border-violet-200 dark:border-violet-800', text: 'text-violet-600' },
-  grok: { logo: 'https://sfile.chatglm.cn/images-ppt/97e90381996c.jpeg', gradient: 'from-slate-600 to-slate-800', bg: 'bg-slate-500/10', border: 'border-slate-300 dark:border-slate-700', text: 'text-slate-600' },
-  minimax: { logo: 'https://sfile.chatglm.cn/images-ppt/464a6068eccc.png', gradient: 'from-pink-500 to-rose-500', bg: 'bg-pink-500/10', border: 'border-pink-200 dark:border-pink-800', text: 'text-pink-600' },
-  custom: { logo: '', gradient: 'from-gray-500 to-gray-600', bg: 'bg-gray-500/10', border: 'border-gray-200 dark:border-gray-800', text: 'text-gray-600' },
+// 提供商配色方案
+const PROVIDER_STYLES: Record<string, { label: string; gradient: string; bg: string; border: string; text: string }> = {
+  deepseek: { label: 'DS', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/10', border: 'border-blue-200 dark:border-blue-800', text: 'text-blue-600' },
+  openai: { label: 'GPT', gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-800', text: 'text-emerald-600' },
+  claude: { label: 'CL', gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-500/10', border: 'border-orange-200 dark:border-orange-800', text: 'text-orange-600' },
+  gemini: { label: 'GM', gradient: 'from-violet-500 to-purple-500', bg: 'bg-violet-500/10', border: 'border-violet-200 dark:border-violet-800', text: 'text-violet-600' },
+  grok: { label: 'GK', gradient: 'from-slate-600 to-slate-800', bg: 'bg-slate-500/10', border: 'border-slate-300 dark:border-slate-700', text: 'text-slate-600' },
+  minimax: { label: 'MM', gradient: 'from-pink-500 to-rose-500', bg: 'bg-pink-500/10', border: 'border-pink-200 dark:border-pink-800', text: 'text-pink-600' },
+  custom: { label: 'API', gradient: 'from-gray-500 to-gray-600', bg: 'bg-gray-500/10', border: 'border-gray-200 dark:border-gray-800', text: 'text-gray-600' },
 }
 
 function getStyle(provider: string) {
   return PROVIDER_STYLES[provider] || PROVIDER_STYLES.custom
 }
 
-// 提供商 Logo 组件
+// 提供商标识组件（文字缩写 + 渐变背景）
 function ProviderLogo({ provider, className }: { provider: string; className?: string }) {
   const style = getStyle(provider)
-  if (!style.logo) {
-    // 自定义 API 用 Cpu 图标
-    return <Cpu className={className || 'w-5 h-5 text-muted-foreground'} />
-  }
+  const size = className || 'w-5 h-5'
   return (
-    <img
-      src={style.logo}
-      alt={provider}
-      className={`${className || 'w-5 h-5'} object-contain rounded-sm`}
-      onError={(e) => {
-        // 图片加载失败时隐藏，显示备用图标
-        const target = e.target as HTMLImageElement
-        target.style.display = 'none'
-        const parent = target.parentElement
-        if (parent && !parent.querySelector('.fallback-icon')) {
-          const fallback = document.createElement('span')
-          fallback.className = 'fallback-icon text-xs'
-          fallback.textContent = provider.slice(0, 2).toUpperCase()
-          parent.appendChild(fallback)
-        }
-      }}
-    />
+    <div className={`${size} rounded-md bg-gradient-to-br ${style.gradient} flex items-center justify-center shrink-0`}>
+      <span className="text-white font-bold text-[9px] leading-none tracking-tight">
+        {style.label}
+      </span>
+    </div>
   )
 }
 
