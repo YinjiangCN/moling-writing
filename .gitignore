@@ -50,5 +50,22 @@ test
 prompt
 
 server.log
+
 # Skills directory
 /skills/
+
+# Database
+db/*.db
+db/*.db-journal
+
+# Download / Upload (user-generated)
+download/
+upload/
+
+# OS files
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
