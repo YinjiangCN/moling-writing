@@ -55,12 +55,14 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DocsView } from './docs-view'
+import { useI18n } from '@/lib/i18n/store'
 import { PlatformConfigTab } from './platform-config-tab'
 
 type AdminTab = 'overview' | 'users' | 'novels' | 'orders' | 'messages' | 'email' | 'redeem' | 'announcements' | 'broadcast' | 'docs' | 'config'
 
 export function AdminView() {
   const [tab, setTab] = useState<AdminTab>('overview')
+  const { t } = useI18n()
 
   return (
     <div className="flex-1 overflow-auto">
@@ -79,47 +81,47 @@ export function AdminView() {
           <TabsList className="grid w-full grid-cols-3 sm:grid-cols-9 h-auto">
             <TabsTrigger value="overview" className="gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" />
-              总览
+              {t("ad.overview")}
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-1.5">
               <Users className="w-3.5 h-3.5" />
-              用户
+              {t("ad.users")}
             </TabsTrigger>
             <TabsTrigger value="novels" className="gap-1.5">
               <BookOpen className="w-3.5 h-3.5" />
-              作品
+              {t("ad.novels")}
             </TabsTrigger>
             <TabsTrigger value="orders" className="gap-1.5">
               <CreditCard className="w-3.5 h-3.5" />
-              订单
+              {t("ad.orders")}
             </TabsTrigger>
             <TabsTrigger value="messages" className="gap-1.5">
               <MessageSquare className="w-3.5 h-3.5" />
-              AI日志
+              {t("ad.aiLogs")}
             </TabsTrigger>
             <TabsTrigger value="announcements" className="gap-1.5">
               <Megaphone className="w-3.5 h-3.5" />
-              公告
+              {t("ad.announcements")}
             </TabsTrigger>
             <TabsTrigger value="broadcast" className="gap-1.5">
               <Send className="w-3.5 h-3.5" />
-              群发
+              {t("ad.broadcast")}
             </TabsTrigger>
             <TabsTrigger value="email" className="gap-1.5">
               <Mail className="w-3.5 h-3.5" />
-              邮箱
+              {t("ad.email")}
             </TabsTrigger>
             <TabsTrigger value="redeem" className="gap-1.5">
               <Ticket className="w-3.5 h-3.5" />
-              兑换码
+              {t("ad.redeemCodes")}
             </TabsTrigger>
             <TabsTrigger value="docs" className="gap-1.5">
               <BookOpen className="w-3.5 h-3.5" />
-              文档
+              {t("ad.docs")}
             </TabsTrigger>
             <TabsTrigger value="config" className="gap-1.5">
               <Settings className="w-3.5 h-3.5" />
-              平台配置
+              {t("ad.config")}
             </TabsTrigger>
           </TabsList>
 
@@ -424,11 +426,11 @@ function UsersTab() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-xs">
                 <tr>
-                  <th className="text-left p-3 font-medium">用户</th>
+                  <th className="text-left p-3 font-medium">{t('ad.users')}</th>
                   <th className="text-left p-3 font-medium">Token</th>
                   <th className="text-left p-3 font-medium">套餐</th>
-                  <th className="text-left p-3 font-medium">作品</th>
-                  <th className="text-left p-3 font-medium">订单</th>
+                  <th className="text-left p-3 font-medium">{t('ad.novels')}</th>
+                  <th className="text-left p-3 font-medium">{t('ad.orders')}</th>
                   <th className="text-left p-3 font-medium">AI调用</th>
                   <th className="text-left p-3 font-medium">注册时间</th>
                   <th className="text-left p-3 font-medium">操作</th>
@@ -560,7 +562,7 @@ function UsersTab() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <Label>用户</Label>
+              <Label>{t('ad.users')}</Label>
               <p className="text-sm text-muted-foreground">{editing?.email}</p>
             </div>
             <div className="space-y-2">
@@ -744,7 +746,7 @@ function OrdersTab() {
               <thead className="bg-muted/50 text-xs">
                 <tr>
                   <th className="text-left p-3">订单ID</th>
-                  <th className="text-left p-3">用户</th>
+                  <th className="text-left p-3">{t('ad.users')}</th>
                   <th className="text-left p-3">金额</th>
                   <th className="text-left p-3">Token</th>
                   <th className="text-left p-3">方式</th>
@@ -1635,7 +1637,7 @@ function RedeemCodesTab() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-xs sticky top-0">
                 <tr>
-                  <th className="text-left p-3">兑换码</th>
+                  <th className="text-left p-3">{t('ad.redeemCodes')}</th>
                   <th className="text-left p-3">奖励</th>
                   <th className="text-left p-3">类型</th>
                   <th className="text-left p-3">状态</th>
@@ -2584,7 +2586,7 @@ function BroadcastTab() {
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <Badge variant="outline" className={`text-xs ${tc.color}`}>{tc.label}</Badge>
                       {item.userId === null ? (
-                        <Badge variant="outline" className="text-xs text-blue-600">群发</Badge>
+                        <Badge variant="outline" className="text-xs text-blue-600">{t('ad.broadcast')}</Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-violet-600">单发</Badge>
                       )}

@@ -4,6 +4,8 @@ import { useAppStore } from '@/lib/store'
 import { LayoutGrid, Settings, User, Sparkles, PenLine, Shield, LogOut, Loader2, Bell, Megaphone, BookOpen } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
 import { MessagesDialog } from '@/components/user/messages-dialog'
+import { LanguageSwitcher } from './language-switcher'
+import { useI18n } from '@/lib/i18n/store'
 import { api } from '@/lib/helpers'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,6 +35,7 @@ interface UserPublic {
 
 export function TopBar() {
   const { user, setUser, authLoading, view, setView, backToWorkspace, setForceChangePassword } = useAppStore()
+  const { t } = useI18n()
   const [tokens, setTokens] = useState<number | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [messagesOpen, setMessagesOpen] = useState(false)
@@ -112,11 +115,11 @@ export function TopBar() {
   }
 
   const navs: { id: 'workspace' | 'plaza' | 'settings' | 'user' | 'admin'; label: string; icon: any; adminOnly?: boolean }[] = [
-    { id: 'workspace', label: '工作台', icon: LayoutGrid },
-    { id: 'plaza', label: '广场', icon: BookOpen },
-    { id: 'settings', label: '设定库', icon: Settings },
-    { id: 'user', label: '用户中心', icon: User },
-    { id: 'admin', label: '管理后台', icon: Shield, adminOnly: true },
+    { id: 'workspace' as const, label: t('nav.workspace'), icon: LayoutGrid },
+    { id: 'plaza' as const, label: t('nav.plaza'), icon: BookOpen },
+    { id: 'settings' as const, label: t('nav.settings'), icon: Settings },
+    { id: 'user' as const, label: t('nav.user'), icon: User },
+    { id: 'admin' as const, label: t('nav.admin'), icon: Shield, adminOnly: true },
   ]
 
   // 鉴权加载中
@@ -144,7 +147,8 @@ export function TopBar() {
           </div>
           <span className="font-bold text-base">墨灵写作</span>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <LanguageSwitcher />
           <Button onClick={() => setView('login')} size="sm" className="gap-1.5">
             <PenLine className="w-3.5 h-3.5" />
             登录 / 注册
@@ -186,6 +190,9 @@ export function TopBar() {
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
+        {/* 语言切换 */}
+        <LanguageSwitcher />
+
         {/* 消息铃铛 - 点击直接弹出弹窗 */}
         <Button
           variant="ghost"

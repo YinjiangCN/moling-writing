@@ -43,6 +43,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AiConfigPanel } from './ai-config-panel'
+import { useI18n } from '@/lib/i18n/store'
 
 interface UserData {
   user: {
@@ -65,6 +66,7 @@ interface UserData {
 type Section = 'profile' | 'recharge' | 'redeem' | 'orders' | 'aiconfig'
 
 export function UserCenter() {
+  const { t } = useI18n()
   const [data, setData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
@@ -216,11 +218,11 @@ export function UserCenter() {
 
   // 侧栏菜单
   const navs: { id: Section; label: string; icon: any; badge?: number }[] = [
-    { id: 'profile', label: '资料与统计', icon: UserIcon },
-    { id: 'recharge', label: '充值与会员', icon: Crown },
-    { id: 'aiconfig', label: 'AI 模型配置', icon: Cpu },
-    { id: 'redeem', label: '兑换码', icon: Ticket },
-    { id: 'orders', label: '充值记录', icon: Receipt, badge: orders.length },
+    { id: 'profile', label: t('uc.profile'), icon: UserIcon },
+    { id: 'recharge', label: t('uc.recharge'), icon: Crown },
+    { id: 'aiconfig', label: t('uc.aiConfig'), icon: Cpu },
+    { id: 'redeem', label: t('uc.redeem'), icon: Ticket },
+    { id: 'orders', label: t('uc.orders'), icon: Receipt, badge: orders.length },
   ]
 
   return (
