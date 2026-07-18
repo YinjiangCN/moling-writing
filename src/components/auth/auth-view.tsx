@@ -86,9 +86,10 @@ export function AuthView() {
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       })
       setUser(r.user)
+      // 根据后端返回设置/清除强制改密码状态
+      setForceChangePassword(!!r.needChangePassword)
       if (r.needChangePassword) {
         toast.warning('检测到默认密码，请立即修改账号信息')
-        setForceChangePassword(true)
       }
       toast.success(`欢迎回来，${r.user.penName || r.user.name || r.user.email}！`)
       setView(r.user.role === 'admin' ? 'admin' : 'workspace')

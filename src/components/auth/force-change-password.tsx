@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function ForceChangePasswordDialog({ open, onClose }: Props) {
-  const { user, setUser, setView } = useAppStore()
+  const { user, setUser, setView, setForceChangePassword } = useAppStore()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -63,6 +63,7 @@ export function ForceChangePasswordDialog({ open, onClose }: Props) {
       // 退出登录
       await api('/api/auth/logout', { method: 'POST' })
       setUser(null)
+      setForceChangePassword(false)
       setView('login')
       onClose()
     } catch (e: any) {

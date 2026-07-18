@@ -59,9 +59,10 @@ export function TopBar() {
           setUser(r.user)
           if (r.user) {
             setTokens(r.user.tokens)
-            if (r.needChangePassword) {
-              setForceChangePassword(true)
-            }
+            // 根据后端返回设置/清除强制改密码状态
+            setForceChangePassword(!!r.needChangePassword)
+          } else {
+            setForceChangePassword(false)
           }
         }
       } catch {
