@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ec4899;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <text x="640" y="280" font-family="sans-serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle">墨灵写作</text>
+  <text x="640" y="340" font-family="sans-serif" font-size="32" fill="white" text-anchor="middle" opacity="0.9">MoLing Writing</text>
+  <text x="640" y="400" font-family="sans-serif" font-size="24" fill="white" text-anchor="middle" opacity="0.8">AI 驱动的网文创作平台</text>
+  <text x="640" y="450" font-family="sans-serif" font-size="18" fill="white" text-anchor="middle" opacity="0.7">Next.js 16 · React 19 · TypeScript · Prisma · Alipay · AI</text>
+  <text x="640" y="560" font-family="sans-serif" font-size="20" fill="white" text-anchor="middle" opacity="0.6">MIT License · github.com/YinjiangCN/moling-writing</text>
+</svg>
